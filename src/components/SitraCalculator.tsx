@@ -564,7 +564,10 @@ export default function SitraCalculator() {
                       <div className="text-sm text-gray-600 space-y-1">
                         <div className="flex justify-between">
                           <span>Rate:</span>
-                          <span>{formatCurrency(result.monthlyRatePerSqm)}/m²/{result.tenure === 'Very Short' ? 'day' : 'month'}</span>
+                          <span>
+                            {formatCurrency(result.tenure === 'Very Short' ? result.dailyRatePerSqm : result.monthlyRatePerSqm)}
+                            /m²/{result.tenure === 'Very Short' ? 'day' : 'month'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span>{result.tenure === 'Very Short' ? 'Daily' : 'Monthly'} rent:</span>

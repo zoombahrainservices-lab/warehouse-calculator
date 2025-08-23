@@ -182,15 +182,13 @@ export class SitraWarehouseCalculator {
     // Get selected services details
     const selectedServicesDetails = this.getServicesDetails(adjustedInputs.selectedServices)
     
-    // Calculate totals
+    // Calculate totals (per period = day for Very Short, month otherwise)
     let monthlyTotal
     if (adjustedInputs.tenure === 'Very Short') {
-      // For Very Short term, calculate daily total
       const dailyWarehouseRent = areaChargeable * applicableRate.daily_rate_per_sqm
       const dailyOfficeRate = this.getOfficeMonthlyRate() / this.getDaysPerMonth()
       monthlyTotal = dailyWarehouseRent + dailyOfficeRate
     } else {
-      // For Short/Long term, use monthly calculation
       monthlyTotal = monthlyWarehouseRent + officeMonthlyRate
     }
     let subtotal = totalWarehouseRent + officeTotalCost + ewaSetupCosts
@@ -222,8 +220,18 @@ export class SitraWarehouseCalculator {
     // Generate suggestions
     const suggestions = this.generateSuggestions(adjustedInputs, applicableRate, monthlyWarehouseRent)
     
-    // Generate monthly breakdown
-    const monthlyBreakdown = this.generateMonthlyBreakdown(adjustedInputs.leaseDurationMonths, monthlyWarehouseRent, officeMonthlyRate)
+    // Generate payment breakdown per period (day for Very Short, month otherwise)
+    const perPeriodWarehouse = adjustedInputs.tenure === 'Very Short'
+      ? (areaChargeable * applicableRate.daily_rate_per_sqm)
+      : monthlyWarehouseRent
+    const perPeriodOffice = adjustedInputs.tenure === 'Very Short'
+      ? (this.getOfficeMonthlyRate() / this.getDaysPerMonth())
+      : officeMonthlyRate
+    const monthlyBreakdown = this.generateMonthlyBreakdown(
+      adjustedInputs.leaseDurationMonths,
+      perPeriodWarehouse,
+      perPeriodOffice
+    )
     
     return {
       // Input Summary
