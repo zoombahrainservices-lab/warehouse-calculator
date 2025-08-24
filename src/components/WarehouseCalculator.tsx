@@ -143,7 +143,7 @@ export default function WarehouseCalculator() {
             <div className="mt-2 text-sm text-red-700">
               <p>{error}</p>
               <p className="mt-2">
-                Make sure you've:
+                Make sure you&apos;ve:
                 <br />• Created your Supabase database
                 <br />• Run the schema.sql file
                 <br />• Set up your environment variables
