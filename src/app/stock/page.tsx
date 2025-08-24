@@ -341,6 +341,20 @@ export default function StockManagement() {
     return groups
   }, {} as Record<string, StockItem[]>)
 
+  // Calculate warehouse capacity metrics
+  const totalSpaceUsed = stockItems.reduce((sum, item) => sum + (item.area_used || 0), 0)
+  const totalQuantity = stockItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
+  const activeItems = stockItems.filter(item => item.status === 'active').length
+  const completedItems = stockItems.filter(item => item.status === 'completed').length
+  const pendingItems = stockItems.filter(item => item.status === 'pending').length
+
+  // Warehouse capacity (you can adjust these values based on your actual warehouse)
+  const groundFloorCapacity = 5000 // m²
+  const mezzanineCapacity = 3000 // m²
+  const totalCapacity = groundFloorCapacity + mezzanineCapacity
+  const spaceAvailable = totalCapacity - totalSpaceUsed
+  const spaceUtilization = (totalSpaceUsed / totalCapacity) * 100
+
   const downloadStockReport = async () => {
     try {
       await generateStockReportPDF(filteredItems, {
@@ -451,6 +465,99 @@ export default function StockManagement() {
             </div>
           </div>
         </div>
+
+        {/* Warehouse Capacity Summary */}
+        {!error && stockItems.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Warehouse Capacity Overview</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{totalSpaceUsed.toFixed(1)} m²</div>
+                <div className="text-sm text-gray-600">Total Space Used</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {spaceUtilization.toFixed(1)}% of {totalCapacity.toFixed(0)} m² capacity
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{spaceAvailable.toFixed(1)} m²</div>
+                <div className="text-sm text-gray-600">Space Available</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {((spaceAvailable / totalCapacity) * 100).toFixed(1)}% remaining
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{totalQuantity.toLocaleString()}</div>
+                <div className="text-sm text-gray-600">Total Quantity</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Across {stockItems.length} stock items
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{activeItems}</div>
+                <div className="text-sm text-gray-600">Active Items</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {completedItems} completed, {pendingItems} pending
+                </div>
+              </div>
+            </div>
+            
+            {/* Space Utilization Bar */}
+            <div className="mt-6">
+              <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Space Utilization</span>
+                <span>{spaceUtilization.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className={`h-3 rounded-full transition-all duration-300 ${
+                    spaceUtilization > 90 ? 'bg-red-500' : 
+                    spaceUtilization > 75 ? 'bg-orange-500' : 
+                    spaceUtilization > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${Math.min(spaceUtilization, 100)}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+            
+            {/* Quick Storage Calculator */}
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-blue-900 mb-3">Quick Storage Calculator</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-blue-700 font-medium">Ground Floor:</span>
+                  <div className="text-blue-600">
+                    {stockItems.filter(item => item.space_type === 'Ground Floor').reduce((sum, item) => sum + (item.area_used || 0), 0).toFixed(1)} m² used
+                  </div>
+                  <div className="text-blue-500">
+                    {(groundFloorCapacity - stockItems.filter(item => item.space_type === 'Ground Floor').reduce((sum, item) => sum + (item.area_used || 0), 0)).toFixed(1)} m² available
+                  </div>
+                </div>
+                <div>
+                  <span className="text-blue-700 font-medium">Mezzanine:</span>
+                  <div className="text-blue-600">
+                    {stockItems.filter(item => item.space_type === 'Mezzanine').reduce((sum, item) => sum + (item.area_used || 0), 0).toFixed(1)} m² used
+                  </div>
+                  <div className="text-blue-500">
+                    {(mezzanineCapacity - stockItems.filter(item => item.space_type === 'Mezzanine').reduce((sum, item) => sum + (item.area_used || 0), 0)).toFixed(1)} m² available
+                  </div>
+                </div>
+                <div>
+                  <span className="text-blue-700 font-medium">Storage Tips:</span>
+                  <div className="text-blue-600 text-xs">
+                    {spaceUtilization > 90 ? '⚠️ Warehouse nearly full!' :
+                     spaceUtilization > 75 ? '⚠️ Consider space optimization' :
+                     spaceUtilization > 50 ? '✅ Good capacity available' : '✅ Plenty of space available'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stock Items */}
         {error ? (
@@ -591,26 +698,20 @@ export default function StockManagement() {
                                 <span className="text-sm font-medium text-gray-900">{item.product_type}</span>
                                 <span className="text-sm text-gray-600">{item.quantity} {item.unit}</span>
                               </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="font-medium text-gray-700">Location:</span>
-                                  <p className="text-gray-600">{item.space_type}</p>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-700">Area:</span>
-                                  <p className="text-gray-600">{item.area_used} m²</p>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-700">Entry:</span>
-                                  <p className="text-gray-600">{new Date(item.entry_date).toLocaleDateString()}</p>
-                                </div>
-                                {item.expected_exit_date && (
-                                  <div>
-                                    <span className="font-medium text-gray-700">Exit:</span>
-                                    <p className="text-gray-600">{new Date(item.expected_exit_date).toLocaleDateString()}</p>
-                                  </div>
-                                )}
-                              </div>
+                                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                 <div>
+                                   <span className="font-medium text-gray-700">Location:</span>
+                                   <p className="text-gray-600">{item.space_type}</p>
+                                 </div>
+                                 <div>
+                                   <span className="font-medium text-gray-700">Space Used:</span>
+                                   <p className="text-gray-600">{item.area_used} m²</p>
+                                 </div>
+                                 <div>
+                                   <span className="font-medium text-gray-700">Storage Location:</span>
+                                   <p className="text-gray-600">{item.storage_location || 'Not specified'}</p>
+                                 </div>
+                               </div>
                               {item.description && (
                                 <div className="mt-2">
                                   <span className="font-medium text-gray-700">Description:</span>
@@ -781,26 +882,29 @@ export default function StockManagement() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
-                  <input
-                    type="date"
-                    value={newStock.entry_date}
-                    onChange={(e) => setNewStock({...newStock, entry_date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expected Exit Date</label>
-                  <input
-                    type="date"
-                    value={newStock.expected_exit_date}
-                    onChange={(e) => setNewStock({...newStock, expected_exit_date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
+                             <div className="grid md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
+                   <input
+                     type="date"
+                     value={newStock.entry_date}
+                     onChange={(e) => setNewStock({...newStock, entry_date: e.target.value})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                   <select
+                     value={newStock.status}
+                     onChange={(e) => setNewStock({...newStock, status: e.target.value as 'active' | 'completed' | 'pending'})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   >
+                     <option value="active">Active</option>
+                     <option value="completed">Completed</option>
+                     <option value="pending">Pending</option>
+                   </select>
+                 </div>
+               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -956,26 +1060,29 @@ export default function StockManagement() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
-                  <input
-                    type="date"
-                    value={editingItem.entry_date}
-                    onChange={(e) => setEditingItem({...editingItem, entry_date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expected Exit Date</label>
-                  <input
-                    type="date"
-                    value={editingItem.expected_exit_date || ''}
-                    onChange={(e) => setEditingItem({...editingItem, expected_exit_date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
+                             <div className="grid md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
+                   <input
+                     type="date"
+                     value={editingItem.entry_date}
+                     onChange={(e) => setEditingItem({...editingItem, entry_date: e.target.value})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                   <select
+                     value={editingItem.status}
+                     onChange={(e) => setEditingItem({...editingItem, status: e.target.value as 'active' | 'completed' | 'pending'})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   >
+                     <option value="active">Active</option>
+                     <option value="completed">Completed</option>
+                     <option value="pending">Pending</option>
+                   </select>
+                 </div>
+               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
