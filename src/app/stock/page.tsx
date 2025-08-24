@@ -31,7 +31,10 @@ export default function StockManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'pending'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showReceiveModal, setShowReceiveModal] = useState(false)
+  const [showDeliverModal, setShowDeliverModal] = useState(false)
   const [editingItem, setEditingItem] = useState<StockItem | null>(null)
+  const [selectedItemForMovement, setSelectedItemForMovement] = useState<StockItem | null>(null)
 
   // New stock item form
   const [newStock, setNewStock] = useState({
@@ -49,6 +52,19 @@ export default function StockManagement() {
     expected_exit_date: '',
     status: 'active' as 'active' | 'completed' | 'pending',
     notes: ''
+  })
+
+  // Movement forms
+  const [receiveForm, setReceiveForm] = useState({
+    quantity: 0,
+    notes: '',
+    date: new Date().toISOString().split('T')[0]
+  })
+
+  const [deliverForm, setDeliverForm] = useState({
+    quantity: 0,
+    notes: '',
+    date: new Date().toISOString().split('T')[0]
   })
 
   useEffect(() => {
@@ -313,6 +329,113 @@ export default function StockManagement() {
     }
   }
 
+  const receiveStock = async () => {
+    if (!selectedItemForMovement || receiveForm.quantity <= 0) {
+      alert('Please select an item and enter a valid quantity')
+      return
+    }
+
+    try {
+      const newQuantity = selectedItemForMovement.quantity + receiveForm.quantity
+      const updatedNotes = selectedItemForMovement.notes 
+        ? `${selectedItemForMovement.notes}\n[${receiveForm.date}] Received: +${receiveForm.quantity} ${selectedItemForMovement.unit}. ${receiveForm.notes}`
+        : `[${receiveForm.date}] Received: +${receiveForm.quantity} ${selectedItemForMovement.unit}. ${receiveForm.notes}`
+
+      // Try client_stock first, then stock_data
+      let { error } = await supabase
+        .from('client_stock')
+        .update({
+          quantity: newQuantity,
+          notes: updatedNotes
+        })
+        .eq('id', selectedItemForMovement.id)
+
+      // If client_stock doesn't exist, try stock_data
+      if (error && error.code === 'PGRST205') {
+        const stockDataUpdate = await supabase
+          .from('stock_data')
+          .update({
+            quantity: newQuantity,
+            notes: updatedNotes
+          })
+          .eq('id', selectedItemForMovement.id)
+        error = stockDataUpdate.error
+      }
+
+      if (error) {
+        console.error('Error receiving stock:', error)
+        alert(`Failed to receive stock: ${error.message}`)
+        return
+      }
+
+      setShowReceiveModal(false)
+      setSelectedItemForMovement(null)
+      setReceiveForm({ quantity: 0, notes: '', date: new Date().toISOString().split('T')[0] })
+      loadStockData()
+      alert(`Successfully received ${receiveForm.quantity} ${selectedItemForMovement.unit}`)
+    } catch (err) {
+      console.error('Error:', err)
+      alert('Failed to receive stock')
+    }
+  }
+
+  const deliverStock = async () => {
+    if (!selectedItemForMovement || deliverForm.quantity <= 0) {
+      alert('Please select an item and enter a valid quantity')
+      return
+    }
+
+    if (deliverForm.quantity > selectedItemForMovement.quantity) {
+      alert('Cannot deliver more than available quantity')
+      return
+    }
+
+    try {
+      const newQuantity = selectedItemForMovement.quantity - deliverForm.quantity
+      const updatedNotes = selectedItemForMovement.notes 
+        ? `${selectedItemForMovement.notes}\n[${deliverForm.date}] Delivered: -${deliverForm.quantity} ${selectedItemForMovement.unit}. ${deliverForm.notes}`
+        : `[${deliverForm.date}] Delivered: -${deliverForm.quantity} ${selectedItemForMovement.unit}. ${deliverForm.notes}`
+
+      // Try client_stock first, then stock_data
+      let { error } = await supabase
+        .from('client_stock')
+        .update({
+          quantity: newQuantity,
+          notes: updatedNotes,
+          status: newQuantity === 0 ? 'completed' : selectedItemForMovement.status
+        })
+        .eq('id', selectedItemForMovement.id)
+
+      // If client_stock doesn't exist, try stock_data
+      if (error && error.code === 'PGRST205') {
+        const stockDataUpdate = await supabase
+          .from('stock_data')
+          .update({
+            quantity: newQuantity,
+            notes: updatedNotes,
+            status: newQuantity === 0 ? 'completed' : selectedItemForMovement.status
+          })
+          .eq('id', selectedItemForMovement.id)
+        error = stockDataUpdate.error
+      }
+
+      if (error) {
+        console.error('Error delivering stock:', error)
+        alert(`Failed to deliver stock: ${error.message}`)
+        return
+      }
+
+      setShowDeliverModal(false)
+      setSelectedItemForMovement(null)
+      setDeliverForm({ quantity: 0, notes: '', date: new Date().toISOString().split('T')[0] })
+      loadStockData()
+      alert(`Successfully delivered ${deliverForm.quantity} ${selectedItemForMovement.unit}`)
+    } catch (err) {
+      console.error('Error:', err)
+      alert('Failed to deliver stock')
+    }
+  }
+
   const downloadClientStockPDF = async (clientItems: StockItem[]) => {
     if (clientItems.length === 0) return
     
@@ -405,35 +528,53 @@ export default function StockManagement() {
               <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
               <p className="text-gray-600 mt-1">Manage client inventory and storage</p>
             </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={downloadStockReport}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Download Report
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add Stock
-              </button>
-              <Link
-                href="/"
-                className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to Calculator
-              </Link>
-            </div>
+                         <div className="flex space-x-3">
+               <button
+                 onClick={downloadStockReport}
+                 className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+               >
+                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                 </svg>
+                 Download Report
+               </button>
+               <button
+                 onClick={() => setShowAddModal(true)}
+                 className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+               >
+                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                 </svg>
+                 Add Stock
+               </button>
+               <button
+                 onClick={() => setShowReceiveModal(true)}
+                 className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+               >
+                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                 </svg>
+                 Receive
+               </button>
+               <button
+                 onClick={() => setShowDeliverModal(true)}
+                 className="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+               >
+                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                 </svg>
+                 Deliver
+               </button>
+               <Link
+                 href="/"
+                 className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+               >
+                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                 </svg>
+                 Back to Calculator
+               </Link>
+             </div>
           </div>
         </div>
       </div>
@@ -1111,8 +1252,197 @@ export default function StockManagement() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
+                 </div>
+       )}
+
+       {/* Receive Stock Modal */}
+       {showReceiveModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+           <div className="bg-white rounded-lg max-w-md w-full">
+             <div className="p-6 border-b border-gray-200">
+               <h2 className="text-xl font-semibold text-gray-900">Receive Stock</h2>
+             </div>
+             
+             <div className="p-6 space-y-4">
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Stock Item</label>
+                 <select
+                   onChange={(e) => {
+                     const selected = stockItems.find(item => item.id === e.target.value)
+                     setSelectedItemForMovement(selected || null)
+                   }}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   required
+                 >
+                   <option value="">Select an item...</option>
+                   {stockItems.map((item) => (
+                     <option key={item.id} value={item.id}>
+                       {item.client_name} - {item.product_type} ({item.quantity} {item.unit})
+                     </option>
+                   ))}
+                 </select>
+               </div>
+
+               {selectedItemForMovement && (
+                 <div className="bg-blue-50 p-3 rounded-lg">
+                   <p className="text-sm text-blue-800">
+                     <strong>Current Stock:</strong> {selectedItemForMovement.quantity} {selectedItemForMovement.unit}
+                   </p>
+                 </div>
+               )}
+
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Receive *</label>
+                 <input
+                   type="number"
+                   value={receiveForm.quantity || ''}
+                   onChange={(e) => setReceiveForm({...receiveForm, quantity: Number(e.target.value)})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   min="1"
+                   required
+                   placeholder="Enter quantity"
+                 />
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                 <input
+                   type="date"
+                   value={receiveForm.date}
+                   onChange={(e) => setReceiveForm({...receiveForm, date: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 />
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                 <textarea
+                   value={receiveForm.notes}
+                   onChange={(e) => setReceiveForm({...receiveForm, notes: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   rows={2}
+                   placeholder="Optional notes about this receipt"
+                 />
+               </div>
+             </div>
+
+             <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+               <button
+                 onClick={() => {
+                   setShowReceiveModal(false)
+                   setSelectedItemForMovement(null)
+                   setReceiveForm({ quantity: 0, notes: '', date: new Date().toISOString().split('T')[0] })
+                 }}
+                 className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={receiveStock}
+                 disabled={!selectedItemForMovement || receiveForm.quantity <= 0}
+                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+               >
+                 Receive Stock
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+
+       {/* Deliver Stock Modal */}
+       {showDeliverModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+           <div className="bg-white rounded-lg max-w-md w-full">
+             <div className="p-6 border-b border-gray-200">
+               <h2 className="text-xl font-semibold text-gray-900">Deliver Stock</h2>
+             </div>
+             
+             <div className="p-6 space-y-4">
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Stock Item</label>
+                 <select
+                   onChange={(e) => {
+                     const selected = stockItems.find(item => item.id === e.target.value)
+                     setSelectedItemForMovement(selected || null)
+                   }}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   required
+                 >
+                   <option value="">Select an item...</option>
+                   {stockItems.map((item) => (
+                     <option key={item.id} value={item.id}>
+                       {item.client_name} - {item.product_type} ({item.quantity} {item.unit})
+                     </option>
+                   ))}
+                 </select>
+               </div>
+
+               {selectedItemForMovement && (
+                 <div className="bg-orange-50 p-3 rounded-lg">
+                   <p className="text-sm text-orange-800">
+                     <strong>Available Stock:</strong> {selectedItemForMovement.quantity} {selectedItemForMovement.unit}
+                   </p>
+                 </div>
+               )}
+
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Deliver *</label>
+                 <input
+                   type="number"
+                   value={deliverForm.quantity || ''}
+                   onChange={(e) => setDeliverForm({...deliverForm, quantity: Number(e.target.value)})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   min="1"
+                   max={selectedItemForMovement?.quantity || 0}
+                   required
+                   placeholder="Enter quantity"
+                 />
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                 <input
+                   type="date"
+                   value={deliverForm.date}
+                   onChange={(e) => setDeliverForm({...deliverForm, date: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 />
+               </div>
+
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                 <textarea
+                   value={deliverForm.notes}
+                   onChange={(e) => setDeliverForm({...deliverForm, notes: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   rows={2}
+                   placeholder="Optional notes about this delivery"
+                 />
+               </div>
+             </div>
+
+             <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+               <button
+                 onClick={() => {
+                   setShowDeliverModal(false)
+                   setSelectedItemForMovement(null)
+                   setDeliverForm({ quantity: 0, notes: '', date: new Date().toISOString().split('T')[0] })
+                 }}
+                 className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={deliverStock}
+                 disabled={!selectedItemForMovement || deliverForm.quantity <= 0 || deliverForm.quantity > (selectedItemForMovement?.quantity || 0)}
+                 className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+               >
+                 Deliver Stock
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   )
+ }
