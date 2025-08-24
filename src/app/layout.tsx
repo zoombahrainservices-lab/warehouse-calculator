@@ -15,6 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Warehouse Calculator",
   description: "Professional warehouse rental calculator for Sitra Warehouse",
+  icons: {
+    icon: [
+      {
+        url: '/calculator.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
