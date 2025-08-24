@@ -135,11 +135,17 @@ export default function StockManagement() {
 
   const addStockItem = async () => {
     try {
+      // Add initial quantity record to notes
+      const initialNotes = newStock.notes 
+        ? `${newStock.notes}\n[${newStock.entry_date}] Initial: ${newStock.quantity} ${newStock.unit}`
+        : `[${newStock.entry_date}] Initial: ${newStock.quantity} ${newStock.unit}`
+
       // Try client_stock table first, then stock_data table
       let { error } = await supabase
         .from('client_stock')
         .insert([{
           ...newStock,
+          notes: initialNotes,
           id: crypto.randomUUID(),
           created_at: new Date().toISOString()
         }])
@@ -166,7 +172,7 @@ export default function StockManagement() {
             entry_date: newStock.entry_date,
             expected_exit_date: newStock.expected_exit_date,
             status: newStock.status,
-            notes: newStock.notes,
+            notes: initialNotes,
             created_at: new Date().toISOString()
           }])
           .select()
@@ -336,7 +342,9 @@ export default function StockManagement() {
     }
 
     try {
-      const newQuantity = selectedItemForMovement.quantity + receiveForm.quantity
+      // Only update the current quantity (for display purposes)
+      // The original quantity remains unchanged for "Total Received" calculation
+      const newCurrentQuantity = selectedItemForMovement.quantity + receiveForm.quantity
       const updatedNotes = selectedItemForMovement.notes 
         ? `${selectedItemForMovement.notes}\n[${receiveForm.date}] Received: +${receiveForm.quantity} ${selectedItemForMovement.unit}. ${receiveForm.notes}`
         : `[${receiveForm.date}] Received: +${receiveForm.quantity} ${selectedItemForMovement.unit}. ${receiveForm.notes}`
@@ -345,7 +353,7 @@ export default function StockManagement() {
       let { error } = await supabase
         .from('client_stock')
         .update({
-          quantity: newQuantity,
+          quantity: newCurrentQuantity,
           notes: updatedNotes
         })
         .eq('id', selectedItemForMovement.id)
@@ -355,7 +363,7 @@ export default function StockManagement() {
         const stockDataUpdate = await supabase
           .from('stock_data')
           .update({
-            quantity: newQuantity,
+            quantity: newCurrentQuantity,
             notes: updatedNotes
           })
           .eq('id', selectedItemForMovement.id)
@@ -735,19 +743,38 @@ export default function StockManagement() {
                        </div>
                      </div>
 
-                     {/* Client Quantity Summary */}
-                     {(() => {
-                       const clientCurrentQuantity = filteredClientItems
-                         .filter(item => item.status === 'active')
-                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
-                       const clientTotalReceived = filteredClientItems
-                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
-                       const clientCompletedQuantity = filteredClientItems
-                         .filter(item => item.status === 'completed')
-                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
-                       const clientPendingQuantity = filteredClientItems
-                         .filter(item => item.status === 'pending')
-                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
+                                           {/* Client Quantity Summary */}
+                      {(() => {
+                        const clientCurrentQuantity = filteredClientItems
+                          .filter(item => item.status === 'active')
+                          .reduce((sum, item) => sum + (item.quantity || 0), 0)
+                        
+                        // Calculate total received by parsing notes to find original quantities
+                        const clientTotalReceived = filteredClientItems.reduce((sum, item) => {
+                          // Start with the current quantity as base
+                          let originalQuantity = item.quantity || 0
+                          
+                          // If there are notes, try to find the original quantity
+                          if (item.notes) {
+                            // Look for the first entry date to determine original quantity
+                            const entryMatch = item.notes.match(/\[(\d{4}-\d{2}-\d{2})\] Initial: (\d+)/)
+                            if (entryMatch) {
+                              originalQuantity = parseInt(entryMatch[2])
+                            } else {
+                              // If no initial entry found, use current quantity as original
+                              originalQuantity = item.quantity || 0
+                            }
+                          }
+                          
+                          return sum + originalQuantity
+                        }, 0)
+                        
+                        const clientCompletedQuantity = filteredClientItems
+                          .filter(item => item.status === 'completed')
+                          .reduce((sum, item) => sum + (item.quantity || 0), 0)
+                        const clientPendingQuantity = filteredClientItems
+                          .filter(item => item.status === 'pending')
+                          .reduce((sum, item) => sum + (item.quantity || 0), 0)
                        
                        return (
                          <div className="bg-green-50 px-6 py-3 border-b border-green-200">
