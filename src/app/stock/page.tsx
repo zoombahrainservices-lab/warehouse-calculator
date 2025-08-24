@@ -594,36 +594,44 @@ export default function StockManagement() {
                        </div>
                      </div>
 
-                     {/* Client Capacity Summary */}
+                     {/* Client Quantity Summary */}
                      {(() => {
-                       const clientSpaceUsed = filteredClientItems.reduce((sum, item) => sum + (item.area_used || 0), 0)
-                       const clientQuantity = filteredClientItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
-                       const clientActiveItems = filteredClientItems.filter(item => item.status === 'active').length
-                       const clientCompletedItems = filteredClientItems.filter(item => item.status === 'completed').length
-                       const clientPendingItems = filteredClientItems.filter(item => item.status === 'pending').length
+                       const clientCurrentQuantity = filteredClientItems
+                         .filter(item => item.status === 'active')
+                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
+                       const clientTotalReceived = filteredClientItems
+                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
+                       const clientCompletedQuantity = filteredClientItems
+                         .filter(item => item.status === 'completed')
+                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
+                       const clientPendingQuantity = filteredClientItems
+                         .filter(item => item.status === 'pending')
+                         .reduce((sum, item) => sum + (item.quantity || 0), 0)
                        
                        return (
-                         <div className="bg-blue-50 px-6 py-3 border-b border-blue-200">
+                         <div className="bg-green-50 px-6 py-3 border-b border-green-200">
                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                              <div className="text-center">
-                               <div className="text-lg font-bold text-blue-600">{clientSpaceUsed.toFixed(1)} m²</div>
-                               <div className="text-xs text-gray-600">Space Used</div>
+                               <div className="text-lg font-bold text-green-600">{clientCurrentQuantity.toLocaleString()}</div>
+                               <div className="text-xs text-gray-600">Current Stock</div>
                              </div>
                              <div className="text-center">
-                               <div className="text-lg font-bold text-green-600">{clientQuantity.toLocaleString()}</div>
-                               <div className="text-xs text-gray-600">Total Quantity</div>
+                               <div className="text-lg font-bold text-blue-600">{clientTotalReceived.toLocaleString()}</div>
+                               <div className="text-xs text-gray-600">Total Received</div>
                              </div>
                              <div className="text-center">
-                               <div className="text-lg font-bold text-orange-600">{clientActiveItems}</div>
-                               <div className="text-xs text-gray-600">Active Items</div>
+                               <div className="text-lg font-bold text-red-600">{clientCompletedQuantity.toLocaleString()}</div>
+                               <div className="text-xs text-gray-600">Completed/Out</div>
                              </div>
                              <div className="text-center">
-                               <div className="text-lg font-bold text-purple-600">{filteredClientItems.length}</div>
-                               <div className="text-xs text-gray-600">Total Items</div>
+                               <div className="text-lg font-bold text-orange-600">{clientPendingQuantity.toLocaleString()}</div>
+                               <div className="text-xs text-gray-600">Pending</div>
                              </div>
                            </div>
                            <div className="mt-2 text-xs text-gray-500 text-center">
-                             {clientCompletedItems} completed • {clientPendingItems} pending
+                             {filteredClientItems.filter(item => item.status === 'active').length} active items • 
+                             {filteredClientItems.filter(item => item.status === 'completed').length} completed • 
+                             {filteredClientItems.filter(item => item.status === 'pending').length} pending
                            </div>
                          </div>
                        )
@@ -642,18 +650,22 @@ export default function StockManagement() {
                                 <span className="text-sm font-medium text-gray-900">{item.product_type}</span>
                                 <span className="text-sm text-gray-600">{item.quantity} {item.unit}</span>
                               </div>
-                                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                 <div>
+                                   <span className="font-medium text-gray-700">Quantity:</span>
+                                   <p className="text-gray-600 font-semibold">{item.quantity.toLocaleString()} {item.unit}</p>
+                                 </div>
                                  <div>
                                    <span className="font-medium text-gray-700">Location:</span>
                                    <p className="text-gray-600">{item.space_type}</p>
                                  </div>
                                  <div>
-                                   <span className="font-medium text-gray-700">Space Used:</span>
-                                   <p className="text-gray-600">{item.area_used} m²</p>
+                                   <span className="font-medium text-gray-700">Storage:</span>
+                                   <p className="text-gray-600">{item.storage_location || 'Not specified'}</p>
                                  </div>
                                  <div>
-                                   <span className="font-medium text-gray-700">Storage Location:</span>
-                                   <p className="text-gray-600">{item.storage_location || 'Not specified'}</p>
+                                   <span className="font-medium text-gray-700">Space:</span>
+                                   <p className="text-gray-600">{item.area_used} m²</p>
                                  </div>
                                </div>
                               {item.description && (
@@ -753,44 +765,64 @@ export default function StockManagement() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    value={newStock.quantity || ''}
-                    onChange={(e) => setNewStock({...newStock, quantity: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <select
-                    value={newStock.unit}
-                    onChange={(e) => setNewStock({...newStock, unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="pieces">Pieces</option>
-                    <option value="boxes">Boxes</option>
-                    <option value="pallets">Pallets</option>
-                    <option value="kg">Kilograms</option>
-                    <option value="tons">Tons</option>
-                    <option value="m3">Cubic Meters</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Area Used (m²)</label>
-                  <input
-                    type="number"
-                    value={newStock.area_used || ''}
-                    onChange={(e) => setNewStock({...newStock, area_used: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    min="0"
-                    step="0.1"
-                  />
-                </div>
-              </div>
+                             <div className="grid md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+                   <input
+                     type="number"
+                     value={newStock.quantity || ''}
+                     onChange={(e) => setNewStock({...newStock, quantity: Number(e.target.value)})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     min="0"
+                     required
+                     placeholder="Enter quantity"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
+                   <select
+                     value={newStock.unit}
+                     onChange={(e) => setNewStock({...newStock, unit: e.target.value})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     required
+                   >
+                     <option value="pieces">Pieces</option>
+                     <option value="boxes">Boxes</option>
+                     <option value="pallets">Pallets</option>
+                     <option value="kg">Kilograms</option>
+                     <option value="tons">Tons</option>
+                     <option value="m3">Cubic Meters</option>
+                   </select>
+                 </div>
+               </div>
+
+               <div className="grid md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Area Used (m²)</label>
+                   <input
+                     type="number"
+                     value={newStock.area_used || ''}
+                     onChange={(e) => setNewStock({...newStock, area_used: Number(e.target.value)})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     min="0"
+                     step="0.1"
+                     placeholder="Optional"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                   <select
+                     value={newStock.status}
+                     onChange={(e) => setNewStock({...newStock, status: e.target.value as 'active' | 'completed' | 'pending'})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     required
+                   >
+                     <option value="active">Active (In Stock)</option>
+                     <option value="completed">Completed (Out)</option>
+                     <option value="pending">Pending</option>
+                   </select>
+                 </div>
+               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -934,41 +966,64 @@ export default function StockManagement() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    value={editingItem.quantity}
-                    onChange={(e) => setEditingItem({...editingItem, quantity: Number(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    min="0"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <input
-                    type="text"
-                    value={editingItem.unit}
-                    onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
+                             <div className="grid md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+                   <input
+                     type="number"
+                     value={editingItem.quantity}
+                     onChange={(e) => setEditingItem({...editingItem, quantity: Number(e.target.value)})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     min="0"
+                     required
+                     placeholder="Enter quantity"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
+                   <select
+                     value={editingItem.unit}
+                     onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     required
+                   >
+                     <option value="pieces">Pieces</option>
+                     <option value="boxes">Boxes</option>
+                     <option value="pallets">Pallets</option>
+                     <option value="kg">Kilograms</option>
+                     <option value="tons">Tons</option>
+                     <option value="m3">Cubic Meters</option>
+                   </select>
+                 </div>
+               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Area Used (m²)</label>
-                <input
-                  type="number"
-                  value={editingItem.area_used || ''}
-                  onChange={(e) => setEditingItem({...editingItem, area_used: Number(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  min="0"
-                  step="0.1"
-                />
-              </div>
+               <div className="grid md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Area Used (m²)</label>
+                   <input
+                     type="number"
+                     value={editingItem.area_used || ''}
+                     onChange={(e) => setEditingItem({...editingItem, area_used: Number(e.target.value)})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     min="0"
+                     step="0.1"
+                     placeholder="Optional"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                   <select
+                     value={editingItem.status}
+                     onChange={(e) => setEditingItem({...editingItem, status: e.target.value as 'active' | 'completed' | 'pending'})}
+                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     required
+                   >
+                     <option value="active">Active (In Stock)</option>
+                     <option value="completed">Completed (Out)</option>
+                     <option value="pending">Pending</option>
+                   </select>
+                 </div>
+               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -1028,30 +1083,16 @@ export default function StockManagement() {
                  </div>
                </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={editingItem.status}
-                    onChange={(e) => setEditingItem({...editingItem, status: e.target.value as 'active' | 'completed' | 'pending'})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea
-                    value={editingItem.notes || ''}
-                    onChange={(e) => setEditingItem({...editingItem, notes: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={2}
-                    placeholder="Additional notes or special instructions"
-                  />
-                </div>
-              </div>
+                             <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                 <textarea
+                   value={editingItem.notes || ''}
+                   onChange={(e) => setEditingItem({...editingItem, notes: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   rows={2}
+                   placeholder="Additional notes or special instructions"
+                 />
+               </div>
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
