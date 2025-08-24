@@ -60,9 +60,12 @@ export interface OptionalService {
   id: string
   name: string
   description: string
-  rate: number
-  unit: string
-  category: 'loading' | 'afterhours' | 'logistics' | 'other'
+  category: 'movement' | 'loading' | 'transportation' | 'customs' | 'handling'
+  pricing_type: 'fixed' | 'hourly' | 'per_event' | 'on_request'
+  rate: number | null
+  unit: string | null
+  time_restriction: string | null
+  is_free: boolean
   active: boolean
   created_at: string
   updated_at: string

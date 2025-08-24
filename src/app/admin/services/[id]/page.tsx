@@ -141,15 +141,15 @@ export default function EditService({ params }: { params: Promise<{ id: string }
                 </label>
                 <select
                   value={service.category}
-                  onChange={(e) => handleChange('category', e.target.value)}
+                  onChange={(e) => handleChange('category', e.target.value as 'movement' | 'loading' | 'transportation' | 'customs' | 'handling')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="movement">Movement</option>
+                  <option value="loading">Loading</option>
                   <option value="transportation">Transportation</option>
                   <option value="customs">Customs</option>
                   <option value="handling">Handling</option>
-                  <option value="security">Security</option>
                 </select>
               </div>
 
@@ -160,7 +160,7 @@ export default function EditService({ params }: { params: Promise<{ id: string }
                 </label>
                 <select
                   value={service.pricing_type}
-                  onChange={(e) => handleChange('pricing_type', e.target.value)}
+                  onChange={(e) => handleChange('pricing_type', e.target.value as 'fixed' | 'hourly' | 'per_event' | 'on_request')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
@@ -170,6 +170,8 @@ export default function EditService({ params }: { params: Promise<{ id: string }
                   <option value="on_request">On Request</option>
                 </select>
               </div>
+
+
 
               {/* Rate */}
               <div>
@@ -183,6 +185,7 @@ export default function EditService({ params }: { params: Promise<{ id: string }
                   onChange={(e) => handleChange('rate', parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="0.00"
+                  disabled={service.pricing_type === 'on_request'}
                 />
               </div>
 
@@ -198,6 +201,21 @@ export default function EditService({ params }: { params: Promise<{ id: string }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., per hour, per event"
                 />
+              </div>
+
+              {/* Is Free */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Free Service
+                </label>
+                <select
+                  value={service.is_free ? 'true' : 'false'}
+                  onChange={(e) => handleChange('is_free', e.target.value === 'true')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="false">Paid</option>
+                  <option value="true">Free</option>
+                </select>
               </div>
 
               {/* Active Status */}
@@ -243,19 +261,7 @@ export default function EditService({ params }: { params: Promise<{ id: string }
                 />
               </div>
 
-              {/* Conditions */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Conditions
-                </label>
-                <input
-                  type="text"
-                  value={service.conditions || ''}
-                  onChange={(e) => handleChange('conditions', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Minimum 2 hours"
-                />
-              </div>
+
             </div>
 
             {/* Action Buttons */}
