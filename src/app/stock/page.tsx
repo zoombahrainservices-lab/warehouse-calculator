@@ -119,7 +119,7 @@ export default function StockManagement() {
   const addStockItem = async () => {
     try {
       // Try client_stock table first, then stock_data table
-      let { data, error } = await supabase
+      let { error } = await supabase
         .from('client_stock')
         .insert([{
           ...newStock,

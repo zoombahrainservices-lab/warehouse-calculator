@@ -1,17 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { type PricingRate, type EWASettings, type OptionalService } from '@/lib/supabase'
+import { type PricingRate, type EWASettings, type OptionalService, type Device } from '@/lib/supabase'
 import { type CalculationInputs } from '@/lib/calculations'
 
 interface QuoteFormProps {
-  pricingRates: PricingRate[]
   ewaSettings: EWASettings
   optionalServices: OptionalService[]
   onCalculate: (inputs: CalculationInputs) => void
 }
 
-export default function QuoteForm({ pricingRates, ewaSettings, optionalServices, onCalculate }: QuoteFormProps) {
+export default function QuoteForm({ ewaSettings, optionalServices, onCalculate }: QuoteFormProps) {
   const [area, setArea] = useState<number>(100)
   const [tenure, setTenure] = useState<'Short' | 'Long'>('Short')
   const [spaceType, setSpaceType] = useState<'Ground Floor' | 'Mezzanine' | 'Office'>('Ground Floor')
@@ -42,7 +41,7 @@ export default function QuoteForm({ pricingRates, ewaSettings, optionalServices,
 
   const handleServiceToggle = (serviceId: string, service: OptionalService) => {
     if (selectedServices[serviceId]) {
-      const { [serviceId]: _removed, ...rest } = selectedServices
+      const { [serviceId]: _unused, ...rest } = selectedServices
       setSelectedServices(rest)
     } else {
       setSelectedServices({
