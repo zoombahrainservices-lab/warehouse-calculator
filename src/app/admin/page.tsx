@@ -107,7 +107,7 @@ export default function AdminPanel() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Sitra Warehouse Admin Panel</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Warehouse Calculator Admin Panel</h1>
             <p className="text-gray-600 mt-1">Manage pricing, services, and offers</p>
           </div>
           <Link 

@@ -252,7 +252,7 @@ export default function SitraCalculator() {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600">Loading Sitra Warehouse Calculator...</span>
+        <span className="ml-3 text-gray-600">Loading Warehouse Calculator...</span>
       </div>
     )
   }
@@ -281,8 +281,8 @@ export default function SitraCalculator() {
             <div className="flex justify-between items-start mb-4">
               <div></div>
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">Sitra Warehouse Calculator</h1>
-                <p className="text-lg text-gray-600 mb-2">Building No. 22, Road 401, Block 604, Al-Qarya, Sitra, Kingdom of Bahrain</p>
+                        <h1 className="text-4xl font-bold text-gray-900 mb-4">Warehouse Calculator</h1>
+        <p className="text-lg text-gray-600 mb-2">Building No. 22, Road 401, Block 604, Al-Qarya, Sitra, Kingdom of Bahrain</p>
                 <div className="text-sm text-gray-500">
                   Ground Floor: 2,184 m² • Mezzanine: 1,250 m² • Land: 4,135 m²
                 </div>
@@ -330,7 +330,7 @@ export default function SitraCalculator() {
                 </button>
                 <div className="pr-8">
                   <h2 className="text-xl font-bold text-blue-900 mb-2">
-                    👋 Welcome to Sitra Warehouse Calculator
+                    👋 Welcome to Warehouse Calculator
                   </h2>
                   <p className="text-blue-800 mb-5">
                     To get your personalized warehouse rental quote, answer these quick questions:
