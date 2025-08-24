@@ -466,98 +466,7 @@ export default function StockManagement() {
           </div>
         </div>
 
-        {/* Warehouse Capacity Summary */}
-        {!error && stockItems.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Warehouse Capacity Overview</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{totalSpaceUsed.toFixed(1)} m²</div>
-                <div className="text-sm text-gray-600">Total Space Used</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {spaceUtilization.toFixed(1)}% of {totalCapacity.toFixed(0)} m² capacity
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{spaceAvailable.toFixed(1)} m²</div>
-                <div className="text-sm text-gray-600">Space Available</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {((spaceAvailable / totalCapacity) * 100).toFixed(1)}% remaining
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{totalQuantity.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Total Quantity</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  Across {stockItems.length} stock items
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{activeItems}</div>
-                <div className="text-sm text-gray-600">Active Items</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {completedItems} completed, {pendingItems} pending
-                </div>
-              </div>
-            </div>
-            
-            {/* Space Utilization Bar */}
-            <div className="mt-6">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>Space Utilization</span>
-                <span>{spaceUtilization.toFixed(1)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div 
-                  className={`h-3 rounded-full transition-all duration-300 ${
-                    spaceUtilization > 90 ? 'bg-red-500' : 
-                    spaceUtilization > 75 ? 'bg-orange-500' : 
-                    spaceUtilization > 50 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}
-                  style={{ width: `${Math.min(spaceUtilization, 100)}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-            
-            {/* Quick Storage Calculator */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-3">Quick Storage Calculator</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-700 font-medium">Ground Floor:</span>
-                  <div className="text-blue-600">
-                    {stockItems.filter(item => item.space_type === 'Ground Floor').reduce((sum, item) => sum + (item.area_used || 0), 0).toFixed(1)} m² used
-                  </div>
-                  <div className="text-blue-500">
-                    {(groundFloorCapacity - stockItems.filter(item => item.space_type === 'Ground Floor').reduce((sum, item) => sum + (item.area_used || 0), 0)).toFixed(1)} m² available
-                  </div>
-                </div>
-                <div>
-                  <span className="text-blue-700 font-medium">Mezzanine:</span>
-                  <div className="text-blue-600">
-                    {stockItems.filter(item => item.space_type === 'Mezzanine').reduce((sum, item) => sum + (item.area_used || 0), 0).toFixed(1)} m² used
-                  </div>
-                  <div className="text-blue-500">
-                    {(mezzanineCapacity - stockItems.filter(item => item.space_type === 'Mezzanine').reduce((sum, item) => sum + (item.area_used || 0), 0)).toFixed(1)} m² available
-                  </div>
-                </div>
-                <div>
-                  <span className="text-blue-700 font-medium">Storage Tips:</span>
-                  <div className="text-blue-600 text-xs">
-                    {spaceUtilization > 90 ? '⚠️ Warehouse nearly full!' :
-                     spaceUtilization > 75 ? '⚠️ Consider space optimization' :
-                     spaceUtilization > 50 ? '✅ Good capacity available' : '✅ Plenty of space available'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Stock Items */}
         {error ? (
@@ -663,27 +572,62 @@ export default function StockManagement() {
 
                 return (
                   <div key={clientKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    {/* Client Header */}
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">{client.client_name}</h3>
-                          <p className="text-gray-600">{client.client_email} • {client.client_phone}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => downloadClientStockPDF(clientItems)}
-                            className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
-                            title="Download PDF Report"
-                          >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            PDF
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                                         {/* Client Header */}
+                     <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                       <div className="flex justify-between items-center">
+                         <div>
+                           <h3 className="text-lg font-semibold text-gray-900">{client.client_name}</h3>
+                           <p className="text-gray-600">{client.client_email} • {client.client_phone}</p>
+                         </div>
+                         <div className="flex items-center space-x-2">
+                           <button
+                             onClick={() => downloadClientStockPDF(clientItems)}
+                             className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                             title="Download PDF Report"
+                           >
+                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                             </svg>
+                             PDF
+                           </button>
+                         </div>
+                       </div>
+                     </div>
+
+                     {/* Client Capacity Summary */}
+                     {(() => {
+                       const clientSpaceUsed = filteredClientItems.reduce((sum, item) => sum + (item.area_used || 0), 0)
+                       const clientQuantity = filteredClientItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
+                       const clientActiveItems = filteredClientItems.filter(item => item.status === 'active').length
+                       const clientCompletedItems = filteredClientItems.filter(item => item.status === 'completed').length
+                       const clientPendingItems = filteredClientItems.filter(item => item.status === 'pending').length
+                       
+                       return (
+                         <div className="bg-blue-50 px-6 py-3 border-b border-blue-200">
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                             <div className="text-center">
+                               <div className="text-lg font-bold text-blue-600">{clientSpaceUsed.toFixed(1)} m²</div>
+                               <div className="text-xs text-gray-600">Space Used</div>
+                             </div>
+                             <div className="text-center">
+                               <div className="text-lg font-bold text-green-600">{clientQuantity.toLocaleString()}</div>
+                               <div className="text-xs text-gray-600">Total Quantity</div>
+                             </div>
+                             <div className="text-center">
+                               <div className="text-lg font-bold text-orange-600">{clientActiveItems}</div>
+                               <div className="text-xs text-gray-600">Active Items</div>
+                             </div>
+                             <div className="text-center">
+                               <div className="text-lg font-bold text-purple-600">{filteredClientItems.length}</div>
+                               <div className="text-xs text-gray-600">Total Items</div>
+                             </div>
+                           </div>
+                           <div className="mt-2 text-xs text-gray-500 text-center">
+                             {clientCompletedItems} completed • {clientPendingItems} pending
+                           </div>
+                         </div>
+                       )
+                     })()}
 
                     {/* Stock Items List */}
                     <div className="divide-y divide-gray-200">
