@@ -245,9 +245,9 @@ export default function AdminPricingRates() {
                 onChange={(e) => setNewRate(prev => ({ ...prev, tenure: e.target.value as 'Short' | 'Long' | 'Very Short' }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
+                <option value="Very Short">Very Short</option>
                 <option value="Short">Short</option>
                 <option value="Long">Long</option>
-                <option value="Very Short">Very Short</option>
               </select>
             </div>
             <div>
@@ -386,9 +386,9 @@ export default function AdminPricingRates() {
                         onChange={(e) => handleRateChange(rate.id, 'tenure', e.target.value)}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
+                        <option value="Very Short">Very Short</option>
                         <option value="Short">Short</option>
                         <option value="Long">Long</option>
-                        <option value="Very Short">Very Short</option>
                       </select>
                     ) : (
                       <div className="text-sm text-gray-900">{rate.tenure}</div>

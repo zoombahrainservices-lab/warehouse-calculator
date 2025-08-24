@@ -126,3 +126,145 @@ export interface Device {
   quantity: number
 }
 
+export interface StockData {
+  id: string
+  // Client Information
+  client_name: string
+  client_email?: string
+  client_phone?: string
+  client_company?: string
+  client_address?: string
+  
+  // Product Information
+  product_name: string
+  product_type: 'food' | 'metals' | 'cargo' | 'electronics' | 'textiles' | 'general' | 'chemicals' | 'automotive' | 'pharmaceutical' | 'other'
+  product_category?: string
+  product_description?: string
+  product_brand?: string
+  product_model?: string
+  
+  // Quantity & Measurements
+  quantity: number
+  unit: 'pieces' | 'boxes' | 'pallets' | 'kg' | 'tons' | 'liters' | 'm3' | 'containers' | 'rolls' | 'bags'
+  weight_kg?: number
+  volume_m3?: number
+  dimensions_length?: number
+  dimensions_width?: number
+  dimensions_height?: number
+  
+  // Storage Information
+  storage_location?: string
+  warehouse_section?: string
+  rack_number?: string
+  shelf_level?: string
+  space_type: 'Ground Floor' | 'Mezzanine'
+  area_occupied_m2: number
+  temperature_controlled?: boolean
+  humidity_controlled?: boolean
+  special_requirements?: string
+  
+  // Dates & Timeline
+  entry_date: string
+  expected_exit_date?: string
+  actual_exit_date?: string
+  last_inspection_date?: string
+  expiry_date?: string
+  
+  // Status & Tracking
+  status: 'active' | 'pending' | 'completed' | 'expired' | 'damaged' | 'reserved'
+  condition_status?: 'excellent' | 'good' | 'fair' | 'damaged' | 'expired'
+  handling_instructions?: string
+  insurance_value?: number
+  customs_cleared?: boolean
+  
+  // Financial Information
+  storage_rate_per_m2?: number
+  monthly_storage_cost?: number
+  total_storage_cost?: number
+  deposit_amount?: number
+  deposit_paid?: boolean
+  
+  // Additional Information
+  barcode?: string
+  qr_code?: string
+  reference_number?: string
+  purchase_order_number?: string
+  invoice_number?: string
+  notes?: string
+  internal_notes?: string
+  
+  // System Fields
+  created_at: string
+  updated_at?: string
+  created_by?: string
+  updated_by?: string
+}
+
+export interface Client {
+  id: string
+  company_name: string
+  contact_person?: string
+  email?: string
+  phone?: string
+  fax?: string
+  address?: string
+  po_box?: string
+  city?: string
+  country?: string
+  website?: string
+  logo_url?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ClientStock {
+  id: string
+  client_id: string
+  
+  // Packing List Details
+  exp_pack_no?: string // Export Pack Number
+  date_packed?: string
+  vehicle_no?: string
+  driver_name?: string
+  uae_cont_no?: string
+  export_cont?: string
+  
+  // Item Details
+  po_no?: string // Purchase Order Number
+  section?: string
+  bundle_id?: string
+  do_no?: string // Delivery Order Number
+  temp_alloy?: string // Temperature/Alloy (like T6 6063)
+  finish?: string // Finish type (like PC/SDF-7037)
+  
+  // Measurements
+  cut_length?: number
+  est_weight?: number
+  order_length?: number
+  no_of_pcs?: number
+  no_of_bundles?: number
+  total_pcs?: number
+  total_weight?: number
+  
+  // Storage Info
+  storage_location?: string
+  space_type?: string
+  area_used?: number
+  
+  // Dates
+  entry_date?: string
+  expected_exit_date?: string
+  
+  // Status
+  status: 'active' | 'packed' | 'shipped' | 'completed' | 'cancelled'
+  notes?: string
+  
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface ClientStockWithClient extends ClientStock {
+  client?: Client
+}
+

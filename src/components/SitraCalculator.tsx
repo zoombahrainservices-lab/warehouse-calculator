@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, type PricingRate, type EWASettings, type OptionalService, type SystemSettings } from '@/lib/supabase'
 import { SitraWarehouseCalculator, type SitraCalculationInputs, type SitraCalculationResult, formatCurrency, formatArea } from '@/lib/sitra-calculator'
+import { generateSitraQuotePDF, generatePDFFromElement } from '@/lib/pdf-generator'
 
 export default function SitraCalculator() {
   // Database data
@@ -27,6 +28,17 @@ export default function SitraCalculator() {
   // Results and error handling
   const [result, setResult] = useState<SitraCalculationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showWelcomeMessage, setShowWelcomeMessage] = useState<boolean>(true)
+  
+  // Welcome message quick answers
+  const [welcomeAnswers, setWelcomeAnswers] = useState({
+    spaceType: null as 'Ground Floor' | 'Mezzanine' | null,
+    productType: null as 'food' | 'metals' | 'cargo' | 'electronics' | 'textiles' | 'general' | null,
+    needOffice: null as boolean | null,
+    duration: null as 'days' | 'months' | 'year+' | null,
+    estimatedArea: null as string | null,
+    customArea: '' as string
+  })
 
   // Auto-adjust lease duration when tenure changes
   useEffect(() => {
@@ -156,6 +168,78 @@ export default function SitraCalculator() {
     )
   }
 
+  // Apply welcome answers to form and close welcome message
+  const applyWelcomeAnswers = () => {
+    if (welcomeAnswers.spaceType) {
+      setSpaceType(welcomeAnswers.spaceType)
+    }
+    if (welcomeAnswers.needOffice !== null) {
+      setIncludeOffice(welcomeAnswers.needOffice)
+    }
+    if (welcomeAnswers.duration) {
+      if (welcomeAnswers.duration === 'days') {
+        setTenure('Very Short')
+        setLeaseDurationMonths(7)
+      } else if (welcomeAnswers.duration === 'months') {
+        setTenure('Short')
+        setLeaseDurationMonths(6)
+      } else if (welcomeAnswers.duration === 'year+') {
+        setTenure('Long')
+        setLeaseDurationMonths(12)
+      }
+    }
+    if (welcomeAnswers.estimatedArea) {
+      if (welcomeAnswers.estimatedArea === 'custom' && welcomeAnswers.customArea) {
+        const area = parseInt(welcomeAnswers.customArea)
+        if (!isNaN(area) && area > 0) {
+          setAreaRequested(area)
+        }
+      } else if (welcomeAnswers.estimatedArea !== 'custom') {
+        const area = parseInt(welcomeAnswers.estimatedArea)
+        if (!isNaN(area) && area > 0) {
+          setAreaRequested(area)
+        }
+      }
+      // If custom is selected but no custom area entered, skip setting area
+      // User can enter it manually in the main form
+    }
+    setShowWelcomeMessage(false)
+  }
+
+  const updateWelcomeAnswer = <K extends keyof typeof welcomeAnswers>(
+    key: K, 
+    value: typeof welcomeAnswers[K]
+  ) => {
+    setWelcomeAnswers(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!result) return
+    
+    try {
+      await generateSitraQuotePDF(result, {
+        companyName: 'Sitra Warehouse',
+        filename: `sitra-warehouse-quote-${new Date().toISOString().split('T')[0]}.pdf`
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF. Please try again.')
+    }
+  }
+
+  const handleDownloadPDFFromElement = async () => {
+    if (!result) return
+    
+    try {
+      await generatePDFFromElement('quote-preview-content', {
+        filename: `sitra-warehouse-quote-${new Date().toISOString().split('T')[0]}.pdf`
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF. Please try again.')
+    }
+  }
+
   // Helper to read numeric system settings strictly (no fallbacks)
   const getSettingNumber = (key: string): number | null => {
     const setting = systemSettings.find(s => s.setting_key === key)
@@ -188,35 +272,318 @@ export default function SitraCalculator() {
     )
   }
 
-  return (
+    return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center items-center mb-4">
-            <div></div>
-            <h1 className="text-4xl font-bold text-gray-900">Sitra Warehouse Calculator</h1>
-            <div className="flex space-x-2 hidden">
-              <button
-                onClick={async () => { await loadData(); setHasUpdates(false) }}
-                disabled={!hasUpdates || loading}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-2 rounded-lg text-sm"
-              >
-                {loading ? 'Loading...' : hasUpdates ? 'Refresh updates' : 'Up to date'}
-              </button>
-              <a 
-                href="/admin"
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm"
-              >
-                Admin Panel
-              </a>
+      {/* Main Title - Always at Top */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center">
+            <div className="flex justify-between items-start mb-4">
+              <div></div>
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">Sitra Warehouse Calculator</h1>
+                <p className="text-lg text-gray-600 mb-2">Building No. 22, Road 401, Block 604, Al-Qarya, Sitra, Kingdom of Bahrain</p>
+                <div className="text-sm text-gray-500">
+                  Ground Floor: 2,184 m² • Mezzanine: 1,250 m² • Land: 4,135 m²
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <a
+                  href="/stock"
+                  className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  Stock Management
+                </a>
+                <a
+                  href="/admin"
+                  className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Admin
+                </a>
+              </div>
             </div>
           </div>
-          <p className="text-lg text-gray-600">Building No. 22, Road 401, Block 604, Al-Qarya, Sitra, Kingdom of Bahrain</p>
-          <div className="text-sm text-gray-500 mt-2">
-            Ground Floor: 2,184 m² • Mezzanine: 1,250 m² • Land: 4,135 m²
+        </div>
+      </div>
+
+      {/* Welcome Message - Below Title */}
+      {/* {showWelcomeMessage && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
+          <div className="container mx-auto px-4 py-6">
+            <div className="max-w-5xl mx-auto">
+              <div className="bg-white border border-blue-200 rounded-lg p-6 shadow-sm relative">
+                <button
+                  onClick={() => setShowWelcomeMessage(false)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Dismiss welcome message"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <div className="pr-8">
+                  <h2 className="text-xl font-bold text-blue-900 mb-2">
+                    👋 Welcome to Sitra Warehouse Calculator
+                  </h2>
+                  <p className="text-blue-800 mb-5">
+                    To get your personalized warehouse rental quote, answer these quick questions:
+                  </p>
+                  
+                  {/* Interactive Questions */}
+                  {/* <div className="space-y-5">
+                    {/* Question 1: Where will you store? */}
+                    {/* <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-blue-600 font-medium">🏢</span>
+                        <span className="text-blue-700 font-medium">Where will you store?</span>
+                      </div>
+                      <div className="flex space-x-3 ml-6">
+                        <button
+                          onClick={() => updateWelcomeAnswer('spaceType', 'Ground Floor')}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.spaceType === 'Ground Floor'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          Ground Floor
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('spaceType', 'Mezzanine')}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.spaceType === 'Mezzanine'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          Mezzanine <span className="text-green-600 text-xs">(20% cheaper)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Question 2: What products will you store? */}
+                    {/* <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-blue-600 font-medium">📦</span>
+                        <span className="text-blue-700 font-medium">What products will you store?</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 ml-6">
+                        <button
+                          onClick={() => updateWelcomeAnswer('productType', 'food')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.productType === 'food'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          🍎 Food Items
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('productType', 'metals')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.productType === 'metals'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          🔩 Metals
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('productType', 'cargo')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.productType === 'cargo'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          📦 Cargo/Freight
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('productType', 'electronics')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.productType === 'electronics'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          💻 Electronics
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('productType', 'textiles')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.productType === 'textiles'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          👕 Textiles
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('productType', 'general')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.productType === 'general'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          📋 General Goods
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Question 3: How much space? */}
+                    {/* <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-blue-600 font-medium">📏</span>
+                        <span className="text-blue-700 font-medium">How much space do you need?</span>
+                      </div>
+                      <div className="flex space-x-3 ml-6">
+                        {['50', '100', '200', '500'].map((area) => (
+                          <button
+                            key={area}
+                            onClick={() => updateWelcomeAnswer('estimatedArea', area)}
+                            className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                              welcomeAnswers.estimatedArea === area
+                                ? 'border-blue-500 bg-blue-100 text-blue-700'
+                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                            }`}
+                          >
+                            {area}m²
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => updateWelcomeAnswer('estimatedArea', 'custom')}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.estimatedArea === 'custom'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          Custom
+                        </button>
+                      </div>
+                      {/* Custom Area Input */}
+                      {/* {welcomeAnswers.estimatedArea === 'custom' && (
+                        <div className="mt-3 ml-6">
+                          <input
+                            type="number"
+                            value={welcomeAnswers.customArea}
+                            onChange={(e) => updateWelcomeAnswer('customArea', e.target.value)}
+                            placeholder="Enter area in m²"
+                            min="1"
+                            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Question 4: How long? */}
+                    {/* <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-blue-600 font-medium">⏰</span>
+                        <span className="text-blue-700 font-medium">How long do you need it?</span>
+                      </div>
+                      <div className="flex space-x-3 ml-6">
+                        <button
+                          onClick={() => updateWelcomeAnswer('duration', 'days')}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.duration === 'days'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          Few Days
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('duration', 'months')}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.duration === 'months'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          Few Months
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('duration', 'year+')}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.duration === 'year+'
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          1+ Year
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Question 5: Need office? */}
+                    {/* <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-blue-600 font-medium">🏢</span>
+                        <span className="text-blue-700 font-medium">Do you need office space?</span>
+                      </div>
+                      <div className="flex space-x-3 ml-6">
+                        <button
+                          onClick={() => updateWelcomeAnswer('needOffice', true)}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.needOffice === true
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={() => updateWelcomeAnswer('needOffice', false)}
+                          className={`px-4 py-2 rounded-lg border-2 text-sm transition-all ${
+                            welcomeAnswers.needOffice === false
+                              ? 'border-blue-500 bg-blue-100 text-blue-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Action Buttons */}
+                  {/* <div className="mt-6 flex space-x-3">
+                    <button
+                      onClick={applyWelcomeAnswers}
+                      disabled={!welcomeAnswers.spaceType}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                    >
+                      Get My Quote →
+                    </button>
+                    <button
+                      onClick={() => setShowWelcomeMessage(false)}
+                      className="px-4 py-3 text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                  
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>💡 Pro tip:</strong> Your quote updates in real-time as you make changes!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      )} */}
+
+      <div className="container mx-auto px-4 py-8">
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
           {/* LEFT PANEL - INPUT FORM */}
@@ -308,7 +675,7 @@ export default function SitraCalculator() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Lease Term</label>
                 <div className="grid grid-cols-3 gap-3">
-                  {(['Short', 'Long', 'Very Short'] as const).map((term) => (
+                  {(['Very Short', 'Short', 'Long'] as const).map((term) => (
                     <button
                       key={term}
                       onClick={() => setTenure(term)}
@@ -533,13 +900,39 @@ export default function SitraCalculator() {
           {/* RIGHT PANEL - REAL-TIME PREVIEW */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Live Quote Preview</h2>
-              <p className="text-sm text-gray-600 mt-1">Updates automatically as you type</p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Live Quote Preview</h2>
+                  <p className="text-sm text-gray-600 mt-1">Updates automatically as you type</p>
+                </div>
+                {result && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleDownloadPDF}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download PDF
+                    </button>
+                    <button
+                      onClick={handleDownloadPDFFromElement}
+                      className="inline-flex items-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Export View
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="p-6">
               {result ? (
-                <div className="space-y-6">
+                <div id="quote-preview-content" className="space-y-6">
                   {/* Quote Header */}
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="text-lg font-semibold text-blue-900">{result.areaBand}</h3>

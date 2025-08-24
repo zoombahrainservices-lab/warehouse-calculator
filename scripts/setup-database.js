@@ -107,6 +107,63 @@ const optionalServices = [
   { name: 'Packing Service', description: 'Professional packing and crating service', category: 'handling', pricing_type: 'per_event', rate: 35, unit: 'per package', time_restriction: null, is_free: false, active: true }
 ]
 
+const clientStockSamples = [
+  {
+    id: 'sample-stock-1',
+    client_name: 'ABC Trading Company',
+    client_email: 'contact@abctrading.com',
+    client_phone: '+973-1234-5678',
+    product_type: 'electronics',
+    quantity: 500,
+    unit: 'pieces',
+    description: 'Laptop computers and accessories',
+    storage_location: 'Section A-1, Rack 1-5',
+    space_type: 'Ground Floor',
+    area_used: 25.5,
+    entry_date: '2024-01-15',
+    expected_exit_date: '2024-06-15',
+    status: 'active',
+    notes: 'Temperature sensitive items',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'sample-stock-2',
+    client_name: 'Gulf Food Distributors',
+    client_email: 'info@gulffood.bh',
+    client_phone: '+973-9876-5432',
+    product_type: 'food',
+    quantity: 200,
+    unit: 'boxes',
+    description: 'Canned goods and dry food items',
+    storage_location: 'Section B-2, Cold Storage',
+    space_type: 'Ground Floor',
+    area_used: 15.0,
+    entry_date: '2024-01-10',
+    expected_exit_date: '2024-04-10',
+    status: 'active',
+    notes: 'Requires temperature control',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'sample-stock-3',
+    client_name: 'Metal Works Ltd',
+    client_email: 'orders@metalworks.com',
+    client_phone: '+973-5555-1234',
+    product_type: 'metals',
+    quantity: 50,
+    unit: 'tons',
+    description: 'Steel pipes and construction materials',
+    storage_location: 'Section C-1, Heavy Storage',
+    space_type: 'Ground Floor',
+    area_used: 100.0,
+    entry_date: '2023-12-20',
+    expected_exit_date: '2024-02-20',
+    status: 'completed',
+    notes: 'Heavy items - special handling required',
+    created_at: new Date().toISOString()
+  }
+]
+
 async function main() {
   console.log('🚀 Setting up warehouse database...')
   
@@ -114,6 +171,7 @@ async function main() {
     // 1. Clear existing data
     console.log('📝 Clearing existing data...')
     await supabase.from('quotes').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('client_stock').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('optional_services').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('ewa_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('pricing_rates').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -222,6 +280,18 @@ async function main() {
     }
     console.log('✅ Optional services inserted successfully')
 
+    // 8. Insert Sample Client Stock
+    console.log('📦 Inserting sample client stock...')
+    const { data: stockData, error: stockError } = await supabase
+      .from('client_stock')
+      .insert(clientStockSamples)
+    
+    if (stockError) {
+      console.error('❌ Error inserting client stock:', stockError)
+      return
+    }
+    console.log('✅ Sample client stock inserted successfully')
+
     console.log('\n🎉 Database setup completed successfully!')
     console.log('\n📊 Summary:')
     console.log(`   • System Settings: ${systemData?.length || 0} records`)
@@ -230,10 +300,12 @@ async function main() {
     console.log(`   • Pricing Rates: ${pricingData?.length || 0} records`)
     console.log(`   • EWA Settings: ${ewaData ? 1 : 0} record`)
     console.log(`   • Optional Services: ${servicesData?.length || 0} records`)
+    console.log(`   • Client Stock: ${stockData?.length || 0} records`)
     
     console.log('\n🚀 Your warehouse calculator is now ready to use!')
     console.log('   • Visit http://localhost:3000 to use the calculator')
     console.log('   • Visit http://localhost:3000/admin to manage data')
+    console.log('   • Visit http://localhost:3000/stock to manage client stock')
 
   } catch (error) {
     console.error('❌ Setup failed:', error)

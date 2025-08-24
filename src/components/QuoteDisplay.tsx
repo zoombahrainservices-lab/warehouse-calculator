@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { type CalculationResult, type CalculationInputs, formatCurrency, formatDate } from '@/lib/calculations'
+import { generateStandardQuotePDF, generatePDFFromElement } from '@/lib/pdf-generator'
 
 interface QuoteDisplayProps {
   result: CalculationResult
@@ -30,8 +31,31 @@ export default function QuoteDisplay({ result, inputs, onSaveQuote }: QuoteDispl
     window.print()
   }
 
+  const handleDownloadPDF = async () => {
+    try {
+      await generateStandardQuotePDF(result, inputs, {
+        companyName: 'Sitra Warehouse',
+        filename: `warehouse-quote-${new Date().toISOString().split('T')[0]}.pdf`
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF. Please try again.')
+    }
+  }
+
+  const handleDownloadPDFFromElement = async () => {
+    try {
+      await generatePDFFromElement('quote-display-content', {
+        filename: `warehouse-quote-${new Date().toISOString().split('T')[0]}.pdf`
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF. Please try again.')
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div id="quote-display-content" className="space-y-6">
       {/* Quote Header */}
       <div className="border-b border-gray-200 pb-4">
         <h3 className="text-lg font-semibold text-gray-900">Warehouse Rental Quote</h3>
@@ -219,18 +243,39 @@ export default function QuoteDisplay({ result, inputs, onSaveQuote }: QuoteDispl
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
         <button
           onClick={() => setShowSaveForm(!showSaveForm)}
-          className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-medium"
+          className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-medium text-sm"
         >
           Save Quote
         </button>
         <button
-          onClick={handlePrint}
-          className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 font-medium"
+          onClick={handleDownloadPDF}
+          className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 font-medium text-sm flex items-center justify-center"
         >
-          Print Quote
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          PDF
+        </button>
+        <button
+          onClick={handleDownloadPDFFromElement}
+          className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 font-medium text-sm flex items-center justify-center"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export
+        </button>
+        <button
+          onClick={handlePrint}
+          className="bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 font-medium text-sm flex items-center justify-center"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Print
         </button>
       </div>
 
