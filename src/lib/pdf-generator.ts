@@ -44,7 +44,7 @@ export async function generatePDFFromElement(
       const computed = window.getComputedStyle(node)
       const styles: CapturedStyles = {}
       colorProperties.forEach((prop) => {
-        styles[prop] = computed[prop as any] || ''
+        styles[prop] = computed[prop as keyof CSSStyleDeclaration] || ''
       })
       captured[tagId] = styles
     })
@@ -277,7 +277,7 @@ export async function generateStandardQuotePDF(
 
 // Generate PDF for stock report
 export async function generateStockReportPDF(
-  stockItems: any[],
+  stockItems: unknown[],
   options: PDFOptions = {}
 ): Promise<void> {
   const pdf = new jsPDF('p', 'mm', 'a4')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, type EWASettings } from '@/lib/supabase'
 
@@ -12,11 +12,7 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadEwa()
-  }, [resolvedParams.id])
-
-  const loadEwa = async () => {
+  const loadEwa = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
@@ -33,7 +29,11 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
     } finally {
       setLoading(false)
     }
-  }
+  }, [resolvedParams.id])
+
+  useEffect(() => {
+    loadEwa()
+  }, [loadEwa])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,7 +62,7 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
       alert('EWA settings updated successfully!')
       router.push('/admin')
     } catch (err) {
-      const message = (err as any)?.message || 'Unknown error'
+      const message = err instanceof Error ? err.message : 'Unknown error'
       console.error('Error updating EWA settings:', err)
       setError(`Failed to update EWA settings: ${message}`)
     } finally {
@@ -70,7 +70,7 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
     }
   }
 
-  const handleChange = (field: keyof EWASettings, value: any) => {
+  const handleChange = (field: keyof EWASettings, value: string | number) => {
     if (!ewa) return
     setEwa({ ...ewa, [field]: value })
   }

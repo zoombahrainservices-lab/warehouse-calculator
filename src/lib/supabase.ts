@@ -89,7 +89,7 @@ export interface Quote {
   ewa_total_estimate: number
   ewa_one_off_costs: number
   optional_services_total: number
-  optional_services_details: any
+  optional_services_details: Record<string, unknown>
   subtotal: number
   discount_percentage: number
   discount_amount: number

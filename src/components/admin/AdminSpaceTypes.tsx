@@ -112,7 +112,7 @@ export default function AdminSpaceTypes() {
     }
   }
 
-  const handleSpaceTypeChange = (id: string, field: keyof SpaceType, value: any) => {
+  const handleSpaceTypeChange = (id: string, field: keyof SpaceType, value: string | number | boolean) => {
     setSpaceTypes(prev => prev.map(st => 
       st.id === id ? { ...st, [field]: value } : st
     ))
@@ -317,7 +317,7 @@ export default function AdminSpaceTypes() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="text-sm font-medium text-blue-900 mb-2">About Space Types</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• <strong>Name:</strong> Display name for the space type (e.g., "Ground Floor", "Mezzanine")</li>
+          <li>• <strong>Name:</strong> Display name for the space type (e.g., &quot;Ground Floor&quot;, &quot;Mezzanine&quot;)</li>
           <li>• <strong>Description:</strong> Optional description of the space type</li>
           <li>• <strong>Sort Order:</strong> Order in which space types appear in the calculator</li>
           <li>• <strong>Status:</strong> Active space types are available in the calculator</li>

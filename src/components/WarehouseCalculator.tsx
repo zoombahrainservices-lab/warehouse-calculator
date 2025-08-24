@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase, type PricingRate, type EWASettings, type OptionalService } from '@/lib/supabase'
-import { WarehouseCalculator as Calculator, type CalculationInputs, type CalculationResult, formatCurrency, formatDate } from '@/lib/calculations'
+import { WarehouseCalculator as Calculator, type CalculationInputs, type CalculationResult } from '@/lib/calculations'
 import QuoteForm from './QuoteForm'
 import QuoteDisplay from './QuoteDisplay'
 

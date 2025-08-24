@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { type PricingRate, type EWASettings, type OptionalService, type Device } from '@/lib/supabase'
+import { type PricingRate, type EWASettings, type OptionalService } from '@/lib/supabase'
 import { type CalculationInputs } from '@/lib/calculations'
 
 interface QuoteFormProps {
@@ -42,7 +42,7 @@ export default function QuoteForm({ pricingRates, ewaSettings, optionalServices,
 
   const handleServiceToggle = (serviceId: string, service: OptionalService) => {
     if (selectedServices[serviceId]) {
-      const { [serviceId]: _, ...rest } = selectedServices
+      const { [serviceId]: _removed, ...rest } = selectedServices
       setSelectedServices(rest)
     } else {
       setSelectedServices({

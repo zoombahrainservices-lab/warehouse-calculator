@@ -12,7 +12,7 @@ export default function SitraCalculator() {
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([])
   const [systemSettings, setSystemSettings] = useState<SystemSettings[]>([])
   const [loading, setLoading] = useState(true)
-  const [hasUpdates, setHasUpdates] = useState(false)
+  const [hasUpdates] = useState(false)
 
   // Form inputs with real-time updates
   const [spaceType, setSpaceType] = useState<'Ground Floor' | 'Mezzanine'>('Ground Floor')
@@ -28,7 +28,7 @@ export default function SitraCalculator() {
   // Results and error handling
   const [result, setResult] = useState<SitraCalculationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showWelcomeMessage, setShowWelcomeMessage] = useState<boolean>(true)
+  const [showWelcomeMessage] = useState<boolean>(true)
   
   // Welcome message quick answers
   const [welcomeAnswers, setWelcomeAnswers] = useState({

@@ -123,7 +123,7 @@ export class SitraWarehouseCalculator {
 
   calculate(inputs: SitraCalculationInputs): SitraCalculationResult {
     // Only auto-adjust lease duration for Long term (business requirement)
-    let adjustedInputs = { ...inputs }
+    const adjustedInputs = { ...inputs }
     if (inputs.tenure === 'Long' && inputs.leaseDurationMonths < 12) {
       adjustedInputs.leaseDurationMonths = 12
     }

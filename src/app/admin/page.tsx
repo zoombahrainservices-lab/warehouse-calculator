@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PricingRate, EWASettings, OptionalService, SystemSettings } from '@/lib/supabase'
 
@@ -109,12 +110,12 @@ export default function AdminPanel() {
             <h1 className="text-3xl font-bold text-gray-900">Sitra Warehouse Admin Panel</h1>
             <p className="text-gray-600 mt-1">Manage pricing, services, and offers</p>
           </div>
-          <a 
+          <Link 
             href="/"
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
           >
             Back to Calculator
-          </a>
+          </Link>
         </div>
 
         {/* Error Message */}

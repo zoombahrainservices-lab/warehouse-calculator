@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { PricingRate } from '@/lib/supabase'
@@ -13,11 +13,7 @@ export default function EditPricingRate({ params }: { params: Promise<{ id: stri
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadPricingRate()
-  }, [resolvedParams.id])
-
-  const loadPricingRate = async () => {
+  const loadPricingRate = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
@@ -34,7 +30,11 @@ export default function EditPricingRate({ params }: { params: Promise<{ id: stri
     } finally {
       setLoading(false)
     }
-  }
+  }, [resolvedParams.id])
+
+  useEffect(() => {
+    loadPricingRate()
+  }, [loadPricingRate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,7 +83,7 @@ export default function EditPricingRate({ params }: { params: Promise<{ id: stri
       alert('Pricing rate updated successfully! The calculator will update automatically.')
       router.push('/admin')
     } catch (err) {
-      const message = (err as any)?.message || JSON.stringify(err) || 'Unknown error'
+      const message = err instanceof Error ? err.message : 'Unknown error'
       console.error('Error updating pricing rate:', err)
       setError(`Failed to update pricing rate: ${message}`)
     } finally {
@@ -91,7 +91,7 @@ export default function EditPricingRate({ params }: { params: Promise<{ id: stri
     }
   }
 
-  const handleChange = (field: keyof PricingRate, value: any) => {
+  const handleChange = (field: keyof PricingRate, value: string | number | boolean | null) => {
     if (!pricingRate) return
     setPricingRate({ ...pricingRate, [field]: value })
   }

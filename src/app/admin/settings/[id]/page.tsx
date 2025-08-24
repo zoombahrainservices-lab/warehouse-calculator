@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, type SystemSettings } from '@/lib/supabase'
 
@@ -12,11 +12,7 @@ export default function EditSystemSetting({ params }: { params: Promise<{ id: st
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadSetting()
-  }, [resolvedParams.id])
-
-  const loadSetting = async () => {
+  const loadSetting = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
@@ -32,7 +28,11 @@ export default function EditSystemSetting({ params }: { params: Promise<{ id: st
     } finally {
       setLoading(false)
     }
-  }
+  }, [resolvedParams.id])
+
+  useEffect(() => {
+    loadSetting()
+  }, [loadSetting])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,7 +50,7 @@ export default function EditSystemSetting({ params }: { params: Promise<{ id: st
       alert('System setting updated successfully!')
       router.push('/admin')
     } catch (err) {
-      const message = (err as any)?.message || 'Unknown error'
+      const message = err instanceof Error ? err.message : 'Unknown error'
       console.error('Error updating system setting:', err)
       setError(`Failed to update system setting: ${message}`)
     } finally {

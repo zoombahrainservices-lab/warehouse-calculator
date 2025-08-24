@@ -5,7 +5,7 @@ import { Client, ClientStock } from './supabase'
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF
+    autoTable: (options: unknown) => jsPDF
   }
 }
 
@@ -25,10 +25,10 @@ export function generatePackingListPDF(data: PackingListData): void {
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
   
-  // Colors
-  const primaryColor = '#1f2937' // Dark gray
-  const headerBg = '#f3f4f6' // Light gray
-  const borderColor = '#d1d5db' // Gray border
+  // Colors (for potential future use)
+  // const primaryColor = '#1f2937' // Dark gray
+  // const headerBg = '#f3f4f6' // Light gray
+  // const borderColor = '#d1d5db' // Gray border
   
   // Header Section
   pdf.setFillColor(240, 240, 240)
@@ -195,7 +195,7 @@ export function generatePackingListPDF(data: PackingListData): void {
       lineWidth: 0.1
     },
     // Highlight totals row
-    didParseCell: function(data: any) {
+    didParseCell: function(data: { row: { index: number }, cell: { styles: { fontStyle: string, fillColor: number[] } } }) {
       if (data.row.index === tableData.length - 1) {
         data.cell.styles.fontStyle = 'bold'
         data.cell.styles.fillColor = [249, 250, 251]
@@ -204,7 +204,7 @@ export function generatePackingListPDF(data: PackingListData): void {
   })
   
   // Footer
-  const finalY = (pdf as any).lastAutoTable.finalY + 20
+  const finalY = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20
   if (finalY < pageHeight - 30) {
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'normal')

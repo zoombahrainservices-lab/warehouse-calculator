@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { generateStockReportPDF } from '@/lib/pdf-generator'
 
@@ -153,7 +154,6 @@ export default function StockManagement() {
           }])
           .select()
         
-        data = stockDataInsert.data
         error = stockDataInsert.error
       }
 
@@ -319,7 +319,7 @@ export default function StockManagement() {
                 </svg>
                 Add Stock
               </button>
-              <a
+              <Link
                 href="/"
                 className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
               >
@@ -327,7 +327,7 @@ export default function StockManagement() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Back to Calculator
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -349,7 +349,7 @@ export default function StockManagement() {
             <div>
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'completed' | 'pending')}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">All Status</option>
@@ -375,7 +375,7 @@ export default function StockManagement() {
                 <div className="bg-white border border-red-200 rounded-lg p-4 mb-4">
                   <h4 className="font-medium text-red-800 mb-2">🔧 Quick Fix:</h4>
                   <p className="text-sm text-red-700 mb-3">
-                    The stock management table doesn't exist yet. You need to create it first.
+                    The stock management table doesn&apos;t exist yet. You need to create it first.
                   </p>
                   
                   <div className="space-y-2">
@@ -422,12 +422,12 @@ export default function StockManagement() {
                   >
                     🔄 Retry Connection
                   </button>
-                  <a
+                  <Link
                     href="/"
                     className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded font-medium transition-colors"
                   >
                     ← Back to Calculator
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -643,7 +643,7 @@ export default function StockManagement() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Space Type</label>
                   <select
                     value={newStock.space_type}
-                    onChange={(e) => setNewStock({...newStock, space_type: e.target.value as any})}
+                    onChange={(e) => setNewStock({...newStock, space_type: e.target.value as 'Ground Floor' | 'Mezzanine'})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="Ground Floor">Ground Floor</option>

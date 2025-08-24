@@ -1,4 +1,4 @@
-import { PricingRate, EWASettings, Device } from './supabase'
+import { PricingRate, EWASettings } from './supabase'
 
 export interface CalculationInputs {
   area: number
@@ -153,7 +153,7 @@ export class SitraWarehouseCalculator {
     if (isOldStructure) {
       console.log('Using old database structure compatibility mode')
       // Fallback to old logic for backward compatibility
-      const oldRates = this.pricingRates as any[]
+      const oldRates = this.pricingRates as PricingRate[]
       const applicableRates = oldRates
         .filter(rate => {
           const tenureMatch = rate.tenure === tenure

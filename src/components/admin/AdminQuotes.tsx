@@ -372,7 +372,7 @@ export default function AdminQuotes() {
                       <div className="mt-2">
                         <p className="text-sm text-gray-600">Services included:</p>
                         <ul className="text-sm text-gray-700 list-disc list-inside">
-                          {Object.entries(selectedQuote.optional_services_details).map(([service, details]: [string, any]) => (
+                          {Object.entries(selectedQuote.optional_services_details).map(([service, details]: [string, { pricing?: string }]) => (
                             <li key={service}>{service}: {details.pricing || 'On Request'}</li>
                           ))}
                         </ul>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { OptionalService } from '@/lib/supabase'
@@ -13,11 +13,7 @@ export default function EditService({ params }: { params: Promise<{ id: string }
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadService()
-  }, [resolvedParams.id])
-
-  const loadService = async () => {
+  const loadService = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase
@@ -34,7 +30,11 @@ export default function EditService({ params }: { params: Promise<{ id: string }
     } finally {
       setLoading(false)
     }
-  }
+  }, [resolvedParams.id])
+
+  useEffect(() => {
+    loadService()
+  }, [loadService])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,7 +61,7 @@ export default function EditService({ params }: { params: Promise<{ id: string }
     }
   }
 
-  const handleChange = (field: keyof OptionalService, value: any) => {
+  const handleChange = (field: keyof OptionalService, value: string | number | boolean | null) => {
     if (!service) return
     setService({ ...service, [field]: value })
   }

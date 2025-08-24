@@ -220,7 +220,7 @@ export default function AdminOptionalServices() {
               <label className="block text-sm font-medium text-gray-700">Category</label>
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value as any})}
+                onChange={(e) => setFormData({...formData, category: e.target.value as 'movement' | 'loading' | 'transportation' | 'customs' | 'handling'})}
                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="movement">Movement</option>
@@ -246,7 +246,7 @@ export default function AdminOptionalServices() {
               <label className="block text-sm font-medium text-gray-700">Pricing Type</label>
               <select
                 value={formData.pricing_type}
-                onChange={(e) => setFormData({...formData, pricing_type: e.target.value as any})}
+                onChange={(e) => setFormData({...formData, pricing_type: e.target.value as 'fixed' | 'hourly' | 'per_event' | 'on_request'})}
                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="fixed">Fixed Rate</option>

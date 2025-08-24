@@ -46,7 +46,7 @@ export interface Quote {
   base_rent: number
   ewa_cost: number
   ewa_mode: 'house_load' | 'dedicated_meter'
-  optional_services: Record<string, any>
+  optional_services: Record<string, unknown>
   subtotal: number
   discount_amount: number
   vat_amount: number

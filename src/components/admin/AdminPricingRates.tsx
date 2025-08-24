@@ -146,7 +146,7 @@ export default function AdminPricingRates() {
     }
   }
 
-  const handleRateChange = (id: string, field: keyof PricingRate, value: any) => {
+  const handleRateChange = (id: string, field: keyof PricingRate, value: string | number | boolean | null) => {
     setPricingRates(prev => prev.map(rate => 
       rate.id === id ? { ...rate, [field]: value } : rate
     ))
@@ -513,7 +513,7 @@ export default function AdminPricingRates() {
         <h4 className="text-sm font-medium text-blue-900 mb-2">About Pricing Rates</h4>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• <strong>Space Type:</strong> The warehouse space type this rate applies to</li>
-          <li>• <strong>Area Band:</strong> Name for the area range (e.g., "Small units", "1,000–1,499 m²")</li>
+          <li>• <strong>Area Band:</strong> Name for the area range (e.g., &quot;Small units&quot;, &quot;1,000–1,499 m²&quot;)</li>
           <li>• <strong>Area Range:</strong> Minimum and maximum area this rate applies to</li>
           <li>• <strong>Tenure:</strong> Lease term (Short, Long, or Very Short)</li>
           <li>• <strong>Monthly Rate:</strong> Rate per square meter per month in BHD</li>

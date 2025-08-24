@@ -131,7 +131,7 @@ export default function AdminOfficePricing() {
     }
   }
 
-  const handlePricingChange = (id: string, field: keyof OfficePricing, value: any) => {
+  const handlePricingChange = (id: string, field: keyof OfficePricing, value: string | number | boolean) => {
     setOfficePricing(prev => prev.map(p => 
       p.id === id ? { ...p, [field]: value } : p
     ))
