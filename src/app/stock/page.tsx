@@ -31,6 +31,7 @@ export default function StockManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'pending'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null)
 
   // New stock item form
   const [newStock, setNewStock] = useState({
@@ -250,6 +251,96 @@ export default function StockManagement() {
     }
   }
 
+  const editStockItem = async (updatedItem: StockItem) => {
+    try {
+      // Try client_stock first, then stock_data
+      let { error } = await supabase
+        .from('client_stock')
+        .update({
+          client_name: updatedItem.client_name,
+          client_email: updatedItem.client_email,
+          client_phone: updatedItem.client_phone,
+          product_type: updatedItem.product_type,
+          quantity: updatedItem.quantity,
+          unit: updatedItem.unit,
+          description: updatedItem.description,
+          storage_location: updatedItem.storage_location,
+          space_type: updatedItem.space_type,
+          area_used: updatedItem.area_used,
+          entry_date: updatedItem.entry_date,
+          expected_exit_date: updatedItem.expected_exit_date,
+          status: updatedItem.status,
+          notes: updatedItem.notes
+        })
+        .eq('id', updatedItem.id)
+
+      // If client_stock doesn't exist, try stock_data
+      if (error && error.code === 'PGRST205') {
+        const stockDataUpdate = await supabase
+          .from('stock_data')
+          .update({
+            client_name: updatedItem.client_name,
+            client_email: updatedItem.client_email,
+            client_phone: updatedItem.client_phone,
+            product_type: updatedItem.product_type,
+            quantity: updatedItem.quantity,
+            unit: updatedItem.unit,
+            product_description: updatedItem.description,
+            storage_location: updatedItem.storage_location,
+            space_type: updatedItem.space_type,
+            area_occupied_m2: updatedItem.area_used,
+            entry_date: updatedItem.entry_date,
+            expected_exit_date: updatedItem.expected_exit_date,
+            status: updatedItem.status,
+            notes: updatedItem.notes
+          })
+          .eq('id', updatedItem.id)
+        error = stockDataUpdate.error
+      }
+
+      if (error) {
+        console.error('Error updating stock item:', error)
+        alert(`Failed to update stock item: ${error.message}`)
+        return
+      }
+
+      setEditingItem(null)
+      loadStockData()
+      alert('Stock item updated successfully!')
+    } catch (err) {
+      console.error('Error:', err)
+      alert('Failed to update stock item')
+    }
+  }
+
+  const downloadClientStockPDF = async (clientItems: StockItem[]) => {
+    if (clientItems.length === 0) return
+    
+    const client = clientItems[0]
+    const filename = `stock-report-${client.client_name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`
+    
+    try {
+      await generateStockReportPDF(clientItems, {
+        filename,
+        title: `Stock Report - ${client.client_name}`,
+        clientName: client.client_name
+      })
+    } catch (err) {
+      console.error('Error generating PDF:', err)
+      alert('Failed to generate PDF')
+    }
+  }
+
+  // Group stock items by client
+  const groupedStockItems = stockItems.reduce((groups, item) => {
+    const key = `${item.client_name}-${item.client_email}-${item.client_phone}`
+    if (!groups[key]) {
+      groups[key] = []
+    }
+    groups[key].push(item)
+    return groups
+  }, {} as Record<string, StockItem[]>)
+
   const downloadStockReport = async () => {
     try {
       await generateStockReportPDF(filteredItems, {
@@ -433,8 +524,8 @@ export default function StockManagement() {
             </div>
           </div>
         ) : (
-          <div className="grid gap-6">
-            {filteredItems.length === 0 ? (
+          <div className="space-y-6">
+            {Object.keys(groupedStockItems).length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                 <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -449,83 +540,111 @@ export default function StockManagement() {
                 </button>
               </div>
             ) : (
-              filteredItems.map((item) => (
-                <div key={item.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{item.client_name}</h3>
-                      <p className="text-gray-600">{item.client_email} • {item.client_phone}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                      </span>
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={() => updateStockStatus(item.id, 'active')}
-                          className="p-1 text-green-600 hover:bg-green-50 rounded"
-                          title="Mark as Active"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => updateStockStatus(item.id, 'completed')}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Mark as Completed"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => deleteStockItem(item.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Delete"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2h8a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V5zM8 8a1 1 0 012 0v3a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v3a1 1 0 11-2 0V8z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+              Object.entries(groupedStockItems).map(([clientKey, clientItems]) => {
+                const client = clientItems[0]
+                const filteredClientItems = clientItems.filter(item => {
+                  const matchesSearch = item.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                       item.product_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                       item.description.toLowerCase().includes(searchTerm.toLowerCase())
+                  
+                  const matchesFilter = filterStatus === 'all' || item.status === filterStatus
+                  
+                  return matchesSearch && matchesFilter
+                })
+
+                if (filteredClientItems.length === 0) return null
+
+                return (
+                  <div key={clientKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    {/* Client Header */}
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{client.client_name}</h3>
+                          <p className="text-gray-600">{client.client_email} • {client.client_phone}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => downloadClientStockPDF(clientItems)}
+                            className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                            title="Download PDF Report"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            PDF
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-700">Product:</span>
-                      <p className="text-gray-600">{item.product_type}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Quantity:</span>
-                      <p className="text-gray-600">{item.quantity} {item.unit}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Location:</span>
-                      <p className="text-gray-600">{item.space_type}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Area:</span>
-                      <p className="text-gray-600">{item.area_used} m²</p>
+                    {/* Stock Items List */}
+                    <div className="divide-y divide-gray-200">
+                      {filteredClientItems.map((item) => (
+                        <div key={item.id} className="px-6 py-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                </span>
+                                <span className="text-sm font-medium text-gray-900">{item.product_type}</span>
+                                <span className="text-sm text-gray-600">{item.quantity} {item.unit}</span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <span className="font-medium text-gray-700">Location:</span>
+                                  <p className="text-gray-600">{item.space_type}</p>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-700">Area:</span>
+                                  <p className="text-gray-600">{item.area_used} m²</p>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-700">Entry:</span>
+                                  <p className="text-gray-600">{new Date(item.entry_date).toLocaleDateString()}</p>
+                                </div>
+                                {item.expected_exit_date && (
+                                  <div>
+                                    <span className="font-medium text-gray-700">Exit:</span>
+                                    <p className="text-gray-600">{new Date(item.expected_exit_date).toLocaleDateString()}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {item.description && (
+                                <div className="mt-2">
+                                  <span className="font-medium text-gray-700">Description:</span>
+                                  <p className="text-gray-600 text-sm">{item.description}</p>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-1 ml-4">
+                              <button
+                                onClick={() => setEditingItem(item)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => deleteStockItem(item.id)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                title="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-
-                  {item.description && (
-                    <div className="mt-3">
-                      <span className="font-medium text-gray-700">Description:</span>
-                      <p className="text-gray-600 text-sm">{item.description}</p>
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex justify-between text-xs text-gray-500">
-                    <span>Entry: {new Date(item.entry_date).toLocaleDateString()}</span>
-                    {item.expected_exit_date && (
-                      <span>Expected Exit: {new Date(item.expected_exit_date).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         )}
@@ -708,6 +827,195 @@ export default function StockManagement() {
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
               >
                 Add Stock Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Stock Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Stock Item</h2>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
+                  <input
+                    type="text"
+                    value={editingItem.client_name}
+                    onChange={(e) => setEditingItem({...editingItem, client_name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Email</label>
+                  <input
+                    type="email"
+                    value={editingItem.client_email}
+                    onChange={(e) => setEditingItem({...editingItem, client_email: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Phone</label>
+                  <input
+                    type="tel"
+                    value={editingItem.client_phone}
+                    onChange={(e) => setEditingItem({...editingItem, client_phone: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+                  <input
+                    type="text"
+                    value={editingItem.product_type}
+                    onChange={(e) => setEditingItem({...editingItem, product_type: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    value={editingItem.quantity}
+                    onChange={(e) => setEditingItem({...editingItem, quantity: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                  <input
+                    type="text"
+                    value={editingItem.unit}
+                    onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Area Used (m²)</label>
+                <input
+                  type="number"
+                  value={editingItem.area_used || ''}
+                  onChange={(e) => setEditingItem({...editingItem, area_used: Number(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={editingItem.description}
+                  onChange={(e) => setEditingItem({...editingItem, description: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Space Type</label>
+                  <select
+                    value={editingItem.space_type}
+                    onChange={(e) => setEditingItem({...editingItem, space_type: e.target.value as 'Ground Floor' | 'Mezzanine'})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Ground Floor">Ground Floor</option>
+                    <option value="Mezzanine">Mezzanine</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Location</label>
+                  <input
+                    type="text"
+                    value={editingItem.storage_location}
+                    onChange={(e) => setEditingItem({...editingItem, storage_location: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., Section A-1, Rack 5"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Entry Date</label>
+                  <input
+                    type="date"
+                    value={editingItem.entry_date}
+                    onChange={(e) => setEditingItem({...editingItem, entry_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expected Exit Date</label>
+                  <input
+                    type="date"
+                    value={editingItem.expected_exit_date || ''}
+                    onChange={(e) => setEditingItem({...editingItem, expected_exit_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={editingItem.status}
+                    onChange={(e) => setEditingItem({...editingItem, status: e.target.value as 'active' | 'completed' | 'pending'})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={editingItem.notes || ''}
+                    onChange={(e) => setEditingItem({...editingItem, notes: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={2}
+                    placeholder="Additional notes or special instructions"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setEditingItem(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => editStockItem(editingItem)}
+                disabled={!editingItem.client_name}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+              >
+                Update Stock Item
               </button>
             </div>
           </div>
