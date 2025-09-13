@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -54,7 +54,7 @@ interface StockForm {
   section: string
 }
 
-export default function MyStock() {
+function MyStockContent() {
   const { user, isLoading: authLoading, logout } = useAuth()
   const searchParams = useSearchParams()
   const bookingIdParam = searchParams.get('bookingId')
@@ -1109,5 +1109,25 @@ export default function MyStock() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function MyStock() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900">
+            Loading...
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Preparing my stock page...
+          </p>
+        </div>
+      </div>
+    }>
+      <MyStockContent />
+    </Suspense>
   )
 } 

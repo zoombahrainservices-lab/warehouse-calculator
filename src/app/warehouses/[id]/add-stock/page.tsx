@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
@@ -20,7 +20,7 @@ interface Occupant {
   status: string
 }
 
-export default function AddStockPage() {
+function AddStockPageContent() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -386,5 +386,25 @@ export default function AddStockPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AddStockPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900">
+            Loading...
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Preparing add stock page...
+          </p>
+        </div>
+      </div>
+    }>
+      <AddStockPageContent />
+    </Suspense>
   )
 }

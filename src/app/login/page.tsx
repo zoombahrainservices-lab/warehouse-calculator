@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
@@ -19,7 +19,7 @@ interface LoginForm {
   password: string
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [activeTab, setActiveTab] = useState<'email' | 'google'>('email')
   const [formData, setFormData] = useState<LoginForm>({
     email: '',
@@ -476,5 +476,27 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <h2 className="mt-6 text-2xl font-bold text-gray-900">
+              Loading...
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Preparing login page...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   )
 }
