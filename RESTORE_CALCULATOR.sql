@@ -121,12 +121,12 @@ INSERT INTO optional_services (
 
 -- 4. Ensure System Settings exist
 INSERT INTO system_settings (id, setting_key, setting_value, description) VALUES 
-('office-monthly-rate', 'office_monthly_rate', '200', 'Monthly rate for office space in BHD'),
-('minimum-charge', 'minimum_charge', '50', 'Minimum monthly charge in BHD'),
-('days-per-month', 'days_per_month', '30', 'Days per month for calculations'),
-('office-free-threshold', 'office_free_threshold', '1000', 'Area threshold for free office (sqm)'),
-('vat-rate', 'vat_rate', '10', 'VAT percentage rate')
-ON CONFLICT (id) DO UPDATE SET
+(gen_random_uuid(), 'office_monthly_rate', '200', 'Monthly rate for office space in BHD'),
+(gen_random_uuid(), 'minimum_charge', '50', 'Minimum monthly charge in BHD'),
+(gen_random_uuid(), 'days_per_month', '30', 'Days per month for calculations'),
+(gen_random_uuid(), 'office_free_threshold', '1000', 'Area threshold for free office (sqm)'),
+(gen_random_uuid(), 'vat_rate', '10', 'VAT percentage rate')
+ON CONFLICT (setting_key) DO UPDATE SET
   setting_value = EXCLUDED.setting_value,
   updated_at = NOW();
 

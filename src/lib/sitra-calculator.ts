@@ -122,6 +122,17 @@ export class SitraWarehouseCalculator {
   }
 
   calculate(inputs: SitraCalculationInputs): SitraCalculationResult {
+    console.log('Starting calculation with inputs:', inputs)
+    console.log('Available pricing rates count:', this.pricingRates.length)
+    console.log('EWA settings available:', !!this.ewaSettings)
+    console.log('System settings count:', this.systemSettings.size)
+
+    // Validate inputs
+    if (!inputs.spaceType || !inputs.tenure || inputs.areaRequested <= 0) {
+      console.error('Invalid inputs:', inputs)
+      throw new Error('Invalid calculation inputs')
+    }
+
     // Only auto-adjust lease duration for Long term (business requirement)
     const adjustedInputs = { ...inputs }
     if (inputs.tenure === 'Long' && inputs.leaseDurationMonths < 12) {
@@ -138,10 +149,19 @@ export class SitraWarehouseCalculator {
       adjustedInputs.leaseDurationMonths = 1
     }
 
+    // Validate that we have pricing rates
+    if (this.pricingRates.length === 0) {
+      console.error('No pricing rates available')
+      throw new Error('No pricing rates configured. Please contact administrator.')
+    }
+
     // Find applicable rate
     const applicableRate = this.findApplicableRate(adjustedInputs.spaceType, adjustedInputs.areaRequested, adjustedInputs.tenure)
     
+    console.log('Applicable rate found:', applicableRate)
+    
     if (!applicableRate) {
+      console.log('No applicable rate found - creating no pricing result')
       // Return a special result indicating no pricing available
       return this.createNoPricingResult(adjustedInputs)
     }
@@ -281,36 +301,40 @@ export class SitraWarehouseCalculator {
   }
 
   private findApplicableRate(spaceType: string, area: number, tenure: string): PricingRate | null {
-    // Special handling for Mezzanine + Very Short term
-    if (spaceType === 'Mezzanine' && tenure === 'Very Short') {
-      // Look up Ground Floor Very Short rate and apply 20% discount
-      const groundFloorRate = this.pricingRates.find(rate => 
-        rate.space_type === 'Ground Floor' && 
-        rate.tenure === 'Very Short' &&
-        rate.active &&
-        area >= rate.area_band_min && 
-        (rate.area_band_max === null || area <= rate.area_band_max)
-      )
-      
-      if (groundFloorRate) {
-        // Return a modified rate with 20% discount applied
-        return {
-          ...groundFloorRate,
-          space_type: 'Mezzanine',
-          monthly_rate_per_sqm: groundFloorRate.monthly_rate_per_sqm * 0.8, // 20% discount
-          daily_rate_per_sqm: groundFloorRate.daily_rate_per_sqm * 0.8 // 20% discount
-        }
-      }
-    }
+    console.log('Finding applicable rate for:', { spaceType, area, tenure })
+    console.log('Available pricing rates:', this.pricingRates.map(r => ({
+      space_type: r.space_type,
+      tenure: r.tenure,
+      area_band_min: r.area_band_min,
+      area_band_max: r.area_band_max,
+      active: r.active
+    })))
 
-    // Regular rate lookup
-    return this.pricingRates.find(rate => 
+    // Direct rate lookup - no more fallback mechanisms
+    const matchingRates = this.pricingRates.filter(rate => 
       rate.space_type === spaceType && 
       rate.tenure === tenure &&
       rate.active &&
       area >= rate.area_band_min && 
       (rate.area_band_max === null || area <= rate.area_band_max)
-    ) || null
+    )
+    
+    console.log('Matching rates for lookup:', matchingRates)
+    
+    const result = matchingRates[0] || null
+    if (!result) {
+      console.log('No applicable rate found. Available rates for this space/tenure:', 
+        this.pricingRates.filter(r => r.space_type === spaceType && r.tenure === tenure && r.active))
+      
+      // Show all available rates for debugging
+      console.log('All available rates:', this.pricingRates.filter(r => r.active).map(r => ({
+        space_type: r.space_type,
+        tenure: r.tenure,
+        area_band: `${r.area_band_min}-${r.area_band_max || '∞'}`
+      })))
+    }
+    
+    return result
   }
 
   private createZeroResult(inputs: SitraCalculationInputs): SitraCalculationResult {
@@ -486,6 +510,30 @@ export class SitraWarehouseCalculator {
           message: `Switch to Long term for ${formatCurrency(savings)}/month savings`,
           currentCost: currentMonthlyRent,
           suggestedCost: longTermMonthlyRent,
+          savings
+        })
+      }
+    }
+
+    // Add tenure confirmation for Long term users
+    if (inputs.tenure === 'Long') {
+      const shortTermRate = this.pricingRates.find(rate => 
+        rate.space_type === inputs.spaceType && 
+        rate.tenure === 'Short' &&
+        rate.active &&
+        inputs.areaRequested >= rate.area_band_min && 
+        (rate.area_band_max === null || inputs.areaRequested <= rate.area_band_max)
+      )
+      
+      if (shortTermRate && shortTermRate.monthly_rate_per_sqm > currentRate.monthly_rate_per_sqm) {
+        const shortTermMonthlyRent = inputs.areaRequested * shortTermRate.monthly_rate_per_sqm
+        const savings = shortTermMonthlyRent - currentMonthlyRent
+        
+        suggestions.push({
+          type: 'tenure_savings',
+          message: `✅ Long term commitment saves you ${formatCurrency(savings)}/month compared to Short term`,
+          currentCost: currentMonthlyRent,
+          suggestedCost: shortTermMonthlyRent,
           savings
         })
       }

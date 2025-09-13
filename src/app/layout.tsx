@@ -13,13 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Warehouse Calculator",
-  description: "Professional warehouse rental calculator for Sitra Warehouse",
+  title: "ZOOM Warehouse Solutions",
+  description: "Professional warehouse rental calculator for ZOOM Warehouse Solutions",
   icons: {
     icon: [
       {
-        url: '/calculator.svg',
-        type: 'image/svg+xml',
+        url: '/zoom-logo.png',
+        type: 'image/png',
+        sizes: '32x32',
       },
     ],
   },

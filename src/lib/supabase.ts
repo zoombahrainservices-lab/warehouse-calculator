@@ -2,8 +2,50 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+// Validate required environment variables
+if (!supabaseUrl) {
+  throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
+}
+
+if (!supabaseAnonKey) {
+  throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is required')
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Admin client with service role key (bypasses RLS)
+// Only create if service role key is available
+let supabaseAdmin: any = null
+let adminAccessStatus = 'not_configured'
+
+if (supabaseServiceKey && supabaseServiceKey.trim() !== '') {
+  try {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    adminAccessStatus = 'initialized'
+    console.log('✅ Admin Supabase client initialized with service role')
+  } catch (error) {
+    console.warn('⚠️ Failed to initialize admin Supabase client:', error)
+    supabaseAdmin = null
+    adminAccessStatus = 'failed'
+  }
+} else {
+  console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not found - admin features will be limited')
+  adminAccessStatus = 'missing_key'
+}
+
+export { supabaseAdmin }
+
+// Helper function to check if admin client is available
+export const hasAdminAccess = () => {
+  return supabaseAdmin !== null
+}
+
+// Helper function to get admin access status
+export const getAdminAccessStatus = () => {
+  return adminAccessStatus
+}
 
 // Database Types - Updated for Real Sitra Warehouse Pricing
 export interface SystemSettings {

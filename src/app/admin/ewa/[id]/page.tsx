@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, type EWASettings } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function EditEWASettings({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const resolvedParams = use(params)
+  const { user, isLoading: authLoading, logout } = useAuth({ requiredRole: 'ADMIN' })
   const [ewa, setEwa] = useState<EWASettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -32,8 +34,10 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
   }, [resolvedParams.id])
 
   useEffect(() => {
-    loadEwa()
-  }, [loadEwa])
+    if (!authLoading) {
+      loadEwa()
+    }
+  }, [authLoading, loadEwa])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,11 +79,20 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
     setEwa({ ...ewa, [field]: value })
   }
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         <span className="ml-3 text-gray-600">Loading...</span>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading EWA settings...</span>
       </div>
     )
   }
@@ -103,18 +116,30 @@ export default function EditEWASettings({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Edit EWA Settings</h1>
-            <p className="text-gray-600 mt-1">Update electricity & water settings</p>
+            <p className="text-gray-600 mt-1">Update EWA configuration for warehouse {resolvedParams.id}</p>
           </div>
-          <button
-            onClick={() => router.push('/admin')}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
-          >
-            Back to Admin Panel
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={logout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+            >
+              Logout
+            </button>
+          </div>
         </div>
+
+        {/* User Info */}
+        {user && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-blue-800">
+              Logged in as: <span className="font-semibold">{user.firstName} {user.lastName}</span> ({user.role})
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">

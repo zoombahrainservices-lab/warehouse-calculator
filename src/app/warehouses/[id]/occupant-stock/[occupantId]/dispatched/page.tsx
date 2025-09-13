@@ -1,0 +1,726 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import Link from 'next/link'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
+
+interface StockItem {
+  id: string
+  client_name: string
+  client_email: string
+  product_type: string
+  quantity: number
+  unit: string
+  description: string
+  storage_location?: string
+  space_type: 'Ground Floor' | 'Mezzanine'
+  area_used: number
+  entry_date: string
+  expected_exit_date?: string
+  actual_exit_date?: string
+  status: 'active' | 'completed' | 'pending' | 'expired' | 'damaged'
+  notes?: string
+  created_at: string
+  current_quantity?: number
+  total_received_quantity?: number
+  total_delivered_quantity?: number
+  initial_quantity?: number
+}
+
+interface Occupant {
+  id: string
+  name: string
+  contact_info: string
+  space_occupied: number
+  floor_type: string
+  section?: string
+  status: string
+  warehouse_id: string
+}
+
+interface Warehouse {
+  id: string
+  name: string
+  location: string
+}
+
+type SortField = 'id' | 'description' | 'product_type' | 'quantity' | 'actual_exit_date' | 'entry_date' | 'status'
+type SortDirection = 'asc' | 'desc'
+
+export default function DispatchedStocksPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { user, isLoading: authLoading, logout } = useAuth({ requiredRole: 'ADMIN' })
+  
+  const [occupant, setOccupant] = useState<Occupant | null>(null)
+  const [warehouse, setWarehouse] = useState<Warehouse | null>(null)
+  const [stockData, setStockData] = useState<StockItem[]>([])
+  const [filteredStockData, setFilteredStockData] = useState<StockItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>('actual_exit_date')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  
+  // Filtering state
+  const [filters, setFilters] = useState({
+    search: '',
+    productType: '',
+    status: '',
+    dateFrom: '',
+    dateTo: ''
+  })
+
+  const warehouseId = params.id as string
+  const occupantId = params.occupantId as string
+  const tableRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (warehouseId && occupantId) {
+      loadDispatchedStocks()
+    }
+  }, [warehouseId, occupantId])
+
+  useEffect(() => {
+    applyFiltersAndSort()
+  }, [stockData, filters, sortField, sortDirection])
+
+  const loadDispatchedStocks = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Load warehouse details
+      const warehouseResponse = await fetch(`/api/warehouses/${warehouseId}`)
+      const warehouseResult = await warehouseResponse.json()
+      if (warehouseResponse.ok) {
+        setWarehouse(warehouseResult.data)
+      }
+
+      // Load occupant details
+      const occupantResponse = await fetch(`/api/warehouses/${warehouseId}/occupants`)
+      const occupantResult = await occupantResponse.json()
+      if (occupantResponse.ok) {
+        const foundOccupant = occupantResult.data.find((occ: any) => occ.id === occupantId)
+        if (foundOccupant) {
+          setOccupant(foundOccupant)
+        }
+      }
+
+      // Load dispatched stock data for this occupant
+      const stockResponse = await fetch(`/api/warehouses/${warehouseId}/dispatched-stock?occupantId=${occupantId}`)
+      const stockResult = await stockResponse.json()
+      
+      if (!stockResponse.ok) {
+        throw new Error(stockResult.error || 'Failed to fetch dispatched stock data')
+      }
+
+      setStockData(stockResult.data || [])
+    } catch (err) {
+      console.error('Error loading dispatched stocks:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load dispatched stock data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const applyFiltersAndSort = () => {
+    let filtered = [...stockData]
+
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filtered = filtered.filter(item => 
+        (item.product_name && item.product_name.toLowerCase().includes(searchLower)) ||
+        (item.description && item.description.toLowerCase().includes(searchLower)) ||
+        item.product_type.toLowerCase().includes(searchLower) ||
+        item.id.toLowerCase().includes(searchLower) ||
+        'dispatched'.includes(searchLower)
+      )
+    }
+
+    // Apply product type filter
+    if (filters.productType) {
+      filtered = filtered.filter(item => item.product_type === filters.productType)
+    }
+
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(item => item.status === filters.status)
+    }
+
+    // Apply date filters (for dispatch date)
+    if (filters.dateFrom) {
+      filtered = filtered.filter(item => item.actual_exit_date && item.actual_exit_date >= filters.dateFrom)
+    }
+    if (filters.dateTo) {
+      filtered = filtered.filter(item => item.actual_exit_date && item.actual_exit_date <= filters.dateTo)
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: any = a[sortField]
+      let bValue: any = b[sortField]
+
+      // Handle date fields
+      if (sortField === 'entry_date' || sortField === 'actual_exit_date') {
+        aValue = new Date(aValue || 0).getTime()
+        bValue = new Date(bValue || 0).getTime()
+      }
+
+      // Handle string fields
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase()
+        bValue = bValue.toLowerCase()
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0
+      }
+    })
+
+    setFilteredStockData(filtered)
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const downloadPDF = async () => {
+    try {
+      // Show loading state
+      const button = document.getElementById('pdf-download-btn')
+      if (button) {
+        button.textContent = 'Generating PDF...'
+        button.setAttribute('disabled', 'true')
+      }
+
+      // Create PDF
+      const pdf = new jsPDF('l', 'mm', 'a4') // Landscape orientation
+      
+      // Add title
+      pdf.setFontSize(16)
+      pdf.text('Dispatched Stocks Report (GDN)', 20, 20)
+      pdf.setFontSize(12)
+      pdf.text(`Occupant: ${occupant?.name || 'N/A'}`, 20, 30)
+      pdf.text(`Warehouse: ${warehouse?.name || 'N/A'}`, 20, 35)
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, 40)
+      pdf.text(`Total Items: ${filteredStockData.length}`, 20, 45)
+
+      // Add table headers
+      let yPosition = 60
+      pdf.setFontSize(10)
+      pdf.text('Stock #', 20, yPosition)
+      pdf.text('Product Name', 40, yPosition)
+      pdf.text('Type', 100, yPosition)
+      pdf.text('Quantity', 120, yPosition)
+      pdf.text('Received Date', 150, yPosition)
+      pdf.text('Dispatch Date', 180, yPosition)
+      pdf.text('Status', 220, yPosition)
+      
+      yPosition += 10
+
+      // Add table data
+      filteredStockData.forEach((item, index) => {
+        if (yPosition > 280) { // Start new page if needed
+          pdf.addPage()
+          yPosition = 20
+        }
+        
+        pdf.text((index + 1).toString(), 20, yPosition)
+        pdf.text((item.product_name || item.description || 'No product name').substring(0, 15), 40, yPosition)
+        pdf.text(item.product_type.substring(0, 10), 100, yPosition)
+        pdf.text(`${item.quantity} ${item.unit}`, 120, yPosition)
+        pdf.text(formatDate(item.entry_date), 150, yPosition)
+        pdf.text(item.expected_exit_date ? formatDateTime(item.expected_exit_date) : 'N/A', 180, yPosition)
+        pdf.text(item.status, 220, yPosition)
+        
+        yPosition += 8
+      })
+
+      // Download the PDF
+      const fileName = `GDN_Report_${occupant?.name || 'Stock'}_${new Date().toISOString().split('T')[0]}.pdf`
+      pdf.save(fileName)
+
+      // Reset button state
+      if (button) {
+        button.textContent = 'Download PDF'
+        button.removeAttribute('disabled')
+      }
+
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Error generating PDF. Please try again.')
+      
+      // Reset button state
+      const button = document.getElementById('pdf-download-btn')
+      if (button) {
+        button.textContent = 'Download PDF'
+        button.removeAttribute('disabled')
+      }
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800'
+      case 'active': return 'bg-blue-100 text-blue-800'
+      case 'pending': return 'bg-yellow-100 text-yellow-800'
+      case 'expired': return 'bg-red-100 text-red-800'
+      case 'damaged': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
+  }
+
+  // Calculate summary statistics
+  const totalItems = filteredStockData.length
+  const totalDispatched = filteredStockData.reduce((sum, item) => sum + (item.quantity || 0), 0)
+  const totalValue = filteredStockData.reduce((sum, item) => sum + (item.quantity * 0), 0) // Placeholder for value calculation
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user || user.role !== 'ADMIN') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <p className="text-gray-600 mb-4">You don't have permission to access this page.</p>
+          <Link href="/login" className="text-blue-600 hover:text-blue-500">
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                GDN - Dispatched Stocks - {occupant?.name || 'Loading...'}
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                {warehouse?.name} • {occupant?.name} • {totalItems} dispatched items
+              </p>
+            </div>
+            <div className="flex space-x-4">
+              <Link
+                href={`/warehouses/${warehouseId}/add-stock?occupantId=${occupantId}`}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>Add Stock</span>
+              </Link>
+              <Link
+                href={`/warehouses/${warehouseId}/occupant-stock/${occupantId}`}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                View Received Stocks
+              </Link>
+              <Link
+                href={`/warehouses/${warehouseId}`}
+                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Back to Warehouse
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Occupant Info */}
+        {occupant && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Occupant Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Name</p>
+                <p className="text-lg font-semibold text-gray-900">{occupant.name}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Contact</p>
+                <p className="text-lg font-semibold text-gray-900">{occupant.contact_info}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Space Occupied</p>
+                <p className="text-lg font-semibold text-gray-900">{occupant.space_occupied} m²</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Status</p>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(occupant.status)}`}>
+                  {occupant.status}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-red-100 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Dispatched Items</p>
+                <p className="text-2xl font-semibold text-gray-900">{totalItems}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Quantity Dispatched</p>
+                <p className="text-2xl font-semibold text-gray-900">{totalDispatched.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Value</p>
+                <p className="text-2xl font-semibold text-gray-900">BHD {totalValue.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Dispatch Rate</p>
+                <p className="text-2xl font-semibold text-gray-900">100%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Filters</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <input
+                type="text"
+                placeholder="Search dispatched items..."
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+              <select
+                value={filters.productType}
+                onChange={(e) => setFilters(prev => ({ ...prev, productType: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Types</option>
+                <option value="food">Food</option>
+                <option value="metals">Metals</option>
+                <option value="cargo">Cargo</option>
+                <option value="electronics">Electronics</option>
+                <option value="textiles">Textiles</option>
+                <option value="general">General</option>
+                <option value="chemicals">Chemicals</option>
+                <option value="automotive">Automotive</option>
+                <option value="pharmaceutical">Pharmaceutical</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="completed">Completed</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="expired">Expired</option>
+                <option value="damaged">Damaged</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dispatch Date From</label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dispatch Date To</label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {loading && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading dispatched stock data...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Dispatched Stock Details (GDN)</h3>
+                  <p className="text-sm text-gray-500">
+                    Showing {filteredStockData.length} of {stockData.length} dispatched items
+                  </p>
+                </div>
+                <button
+                  id="pdf-download-btn"
+                  onClick={downloadPDF}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md transition-colors flex items-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Download PDF</span>
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto" ref={tableRef}>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('id')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Stock #</span>
+                        {getSortIcon('id')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('description')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Product Name</span>
+                        {getSortIcon('description')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('product_type')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Type</span>
+                        {getSortIcon('product_type')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('quantity')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Quantity Dispatched</span>
+                        {getSortIcon('quantity')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('entry_date')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Received Date</span>
+                        {getSortIcon('entry_date')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('expected_exit_date')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Dispatch Date</span>
+                        {getSortIcon('expected_exit_date')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Status</span>
+                        {getSortIcon('status')}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredStockData.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {index + 1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {item.product_name || item.description || 'No product name'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.product_type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.quantity} {item.unit}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(item.entry_date)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.expected_exit_date ? formatDateTime(item.expected_exit_date) : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {filteredStockData.length === 0 && (
+              <div className="text-center py-8">
+                <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Dispatched Items Found</h3>
+                <p className="text-gray-600">
+                  {stockData.length === 0 
+                    ? 'No items have been dispatched for this occupant yet.'
+                    : 'No dispatched items match your current filters.'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
