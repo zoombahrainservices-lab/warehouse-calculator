@@ -601,7 +601,7 @@ function MyStockContent() {
               <p className="text-gray-600 mt-1 text-sm md:text-base">Manage your warehouse stock items</p>
               {user && (
                 <div className="mt-1">
-                  <p className="text-blue-600 text-sm">Welcome, {user.firstName} {user.lastName}</p>
+                  <p className="text-blue-600 text-sm">Welcome, {user?.name || user?.email}</p>
                 </div>
               )}
             </div>

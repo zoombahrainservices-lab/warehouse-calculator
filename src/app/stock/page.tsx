@@ -30,6 +30,7 @@ interface StockItem {
   total_received_quantity?: number
   total_delivered_quantity?: number
   initial_quantity?: number
+  remaining_quantity?: number
 }
 
 interface StockMovement {
@@ -56,7 +57,13 @@ function StockContent() {
     location: string
     total_space: number
     has_mezzanine: boolean
+    mezzanine_space?: number
     status: string
+    // Calculated fields
+    occupied_space?: number
+    free_space?: number
+    mezzanine_occupied?: number
+    mezzanine_free?: number
   }
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -159,7 +166,7 @@ function StockContent() {
         if (error.code === 'PGRST205') {
           console.error('❌ client_stock table does not exist - this is a critical database issue!')
           setError('Database configuration error: client_stock table missing. Contact system administrator.')
-        } else if (error.message) {
+        } else if (error instanceof Error && error.message) {
           setError(`Failed to load stock data: ${error.message}`)
         } else {
           setError('Database connection failed. Please check your Supabase configuration.')
@@ -224,7 +231,7 @@ function StockContent() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.log('Movement tracking not available:', error.message)
+        console.log('Movement tracking not available:', error instanceof Error ? error.message : 'Unknown error')
         setStockMovements([])
         return
       }
@@ -285,7 +292,7 @@ function StockContent() {
       }
 
       // If there's an error with the new columns, try inserting without them
-      if (error && (error.message?.includes('current_quantity') || error.message?.includes('total_received_quantity') || error.message?.includes('total_delivered_quantity') || error.message?.includes('initial_quantity'))) {
+      if (error && (error instanceof Error && (error.message?.includes('current_quantity') || error.message?.includes('total_received_quantity') || error.message?.includes('total_delivered_quantity') || error.message?.includes('initial_quantity')))) {
         console.log('New columns not available, inserting basic data only')
         const basicInsert = await supabase
           .from('client_stock')
@@ -300,7 +307,7 @@ function StockContent() {
 
       if (error) {
         console.error('Error adding stock item:', error)
-        alert(`Failed to add stock item: ${error.message || 'Unknown error'}`)
+        alert(`Failed to add stock item: ${error instanceof Error ? error.message : 'Unknown error'}`)
         return
       }
 
@@ -402,7 +409,7 @@ function StockContent() {
 
       if (error) {
         console.error('Error updating status:', error)
-        alert(`Failed to update status: ${error.message}`)
+        alert(`Failed to update status: ${error instanceof Error ? error.message : 'Unknown error'}`)
         return
       }
 
@@ -435,7 +442,7 @@ function StockContent() {
           return
         }
         
-        alert(`Failed to delete stock item: ${error.message}`)
+        alert(`Failed to delete stock item: ${error instanceof Error ? error.message : 'Unknown error'}`)
         return
       }
 
@@ -489,7 +496,7 @@ function StockContent() {
           return
         }
         
-        alert(`Failed to update stock item: ${error.message}`)
+        alert(`Failed to update stock item: ${error instanceof Error ? error.message : 'Unknown error'}`)
         return
       }
 
@@ -516,7 +523,7 @@ function StockContent() {
 
       if (error) {
         console.error('Error updating stock item:', error)
-        alert(`Failed to update stock item: ${error.message}`)
+        alert(`Failed to update stock item: ${typeof error === 'object' && error && 'message' in error ? (error as any).message : 'Unknown error'}`)
         return
       }
 
@@ -589,7 +596,7 @@ function StockContent() {
       }
 
       // If there's an error with the new columns, try updating just the basic quantity
-      if (error && (error.message?.includes('current_quantity') || error.message?.includes('total_received_quantity'))) {
+      if (error && (error instanceof Error && (error.message?.includes('current_quantity') || error.message?.includes('total_received_quantity')))) {
         console.log('New columns not available, updating basic quantity only')
         const basicUpdate = await supabase
           .from('client_stock')
@@ -602,7 +609,7 @@ function StockContent() {
 
       if (error) {
         console.error('Error receiving stock:', error)
-        alert(`Failed to receive stock: ${error.message || 'Unknown error'}`)
+        alert(`Failed to receive stock: ${error instanceof Error ? error.message : 'Unknown error'}`)
         return
       }
 
@@ -682,7 +689,7 @@ function StockContent() {
       }
 
       // If there's an error with the new columns, try updating just the basic quantity
-      if (error && (error.message?.includes('current_quantity') || error.message?.includes('total_delivered_quantity'))) {
+      if (error && (error instanceof Error && (error.message?.includes('current_quantity') || error.message?.includes('total_delivered_quantity')))) {
         console.log('New columns not available, updating basic quantity only')
         const basicUpdate = await supabase
           .from('client_stock')
@@ -696,7 +703,7 @@ function StockContent() {
 
       if (error) {
         console.error('Error delivering stock:', error)
-        alert(`Failed to deliver stock: ${error.message || 'Unknown error'}`)
+        alert(`Failed to deliver stock: ${error instanceof Error ? error.message : 'Unknown error'}`)
         return
       }
 
@@ -1395,8 +1402,8 @@ function StockContent() {
                          if (!selectedWarehouse) return 'border-gray-300'
                          
                          const availableSpace = newStock.space_type === 'Mezzanine' 
-                           ? selectedWarehouse.mezzanine_free 
-                           : selectedWarehouse.free_space
+                           ? (selectedWarehouse.mezzanine_free || 0)
+                           : (selectedWarehouse.free_space || 0)
                          
                          return newStock.area_used > availableSpace 
                            ? 'border-red-300 bg-red-50' 
@@ -1412,8 +1419,8 @@ function StockContent() {
                      if (!selectedWarehouse) return null
                      
                      const availableSpace = newStock.space_type === 'Mezzanine' 
-                       ? selectedWarehouse.mezzanine_free 
-                       : selectedWarehouse.free_space
+                       ? (selectedWarehouse.mezzanine_free || 0)
+                       : (selectedWarehouse.free_space || 0)
                      
                      if (newStock.area_used > availableSpace) {
                        return (
@@ -1448,15 +1455,15 @@ function StockContent() {
                          <div className="text-xs text-blue-700">Total Space (m²)</div>
                        </div>
                        <div>
-                         <div className="text-lg font-bold text-orange-600">{selectedWarehouse.occupied_space.toLocaleString()}</div>
+                         <div className="text-lg font-bold text-orange-600">{(selectedWarehouse.occupied_space || 0).toLocaleString()}</div>
                          <div className="text-xs text-orange-700">Occupied Space (m²)</div>
                        </div>
                        <div>
-                         <div className="text-lg font-bold text-green-600">{selectedWarehouse.free_space.toLocaleString()}</div>
+                         <div className="text-lg font-bold text-green-600">{(selectedWarehouse.free_space || 0).toLocaleString()}</div>
                          <div className="text-xs text-green-700">Available Space (m²)</div>
                        </div>
                        <div>
-                         <div className="text-lg font-bold text-purple-600">{((selectedWarehouse.occupied_space / selectedWarehouse.total_space) * 100).toFixed(1)}%</div>
+                         <div className="text-lg font-bold text-purple-600">{(((selectedWarehouse.occupied_space || 0) / selectedWarehouse.total_space) * 100).toFixed(1)}%</div>
                          <div className="text-xs text-purple-700">Utilization</div>
                  </div>
                </div>
@@ -1466,20 +1473,20 @@ function StockContent() {
                          <h4 className="text-sm font-medium text-blue-800 mb-2">Mezzanine Floor</h4>
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
-                             <div className="text-lg font-bold text-green-600">{selectedWarehouse.mezzanine_space.toLocaleString()}</div>
+                             <div className="text-lg font-bold text-green-600">{(selectedWarehouse.mezzanine_space || 0).toLocaleString()}</div>
                              <div className="text-xs text-green-700">Mezzanine Space (m²)</div>
               </div>
                            <div>
-                             <div className="text-lg font-bold text-orange-600">{selectedWarehouse.mezzanine_occupied.toLocaleString()}</div>
+                             <div className="text-lg font-bold text-orange-600">{(selectedWarehouse.mezzanine_occupied || 0).toLocaleString()}</div>
                              <div className="text-xs text-orange-700">Mezzanine Occupied (m²)</div>
                            </div>
                            <div>
-                             <div className="text-lg font-bold text-green-600">{selectedWarehouse.mezzanine_free.toLocaleString()}</div>
+                             <div className="text-lg font-bold text-green-600">{(selectedWarehouse.mezzanine_free || 0).toLocaleString()}</div>
                              <div className="text-xs text-green-700">Mezzanine Available (m²)</div>
                            </div>
                            <div>
                              <div className="text-lg font-bold text-purple-600">
-                               {selectedWarehouse.mezzanine_space > 0 ? ((selectedWarehouse.mezzanine_occupied / selectedWarehouse.mezzanine_space) * 100).toFixed(1) : '0'}%
+                               {(selectedWarehouse.mezzanine_space || 0) > 0 ? (((selectedWarehouse.mezzanine_occupied || 0) / (selectedWarehouse.mezzanine_space || 1)) * 100).toFixed(1) : '0'}%
                              </div>
                              <div className="text-xs text-purple-700">Mezzanine Utilization</div>
                            </div>
@@ -1496,8 +1503,8 @@ function StockContent() {
                                <span className="text-gray-600">New Occupied:</span>
                                <span className="font-medium text-orange-600 ml-1">
                                  {newStock.space_type === 'Mezzanine' 
-                                   ? (selectedWarehouse.mezzanine_occupied + newStock.area_used).toLocaleString()
-                                   : (selectedWarehouse.occupied_space + newStock.area_used).toLocaleString()
+                                   ? ((selectedWarehouse.mezzanine_occupied || 0) + newStock.area_used).toLocaleString()
+                                   : ((selectedWarehouse.occupied_space || 0) + newStock.area_used).toLocaleString()
                                  } m²
                                </span>
                              </div>
@@ -1505,21 +1512,21 @@ function StockContent() {
                                <span className="text-gray-600">Remaining:</span>
                                <span className={`font-medium ml-1 ${
                                  (newStock.space_type === 'Mezzanine' 
-                                   ? selectedWarehouse.mezzanine_free 
-                                   : selectedWarehouse.free_space) - newStock.area_used >= 0 
+                                   ? (selectedWarehouse.mezzanine_free || 0)
+                                   : (selectedWarehouse.free_space || 0)) - newStock.area_used >= 0 
                                    ? 'text-green-600' 
                                    : 'text-red-600'
                                }`}>
                                  {(newStock.space_type === 'Mezzanine' 
-                                   ? selectedWarehouse.mezzanine_free 
-                                   : selectedWarehouse.free_space) - newStock.area_used} m²
+                                   ? (selectedWarehouse.mezzanine_free || 0)
+                                   : (selectedWarehouse.free_space || 0)) - newStock.area_used} m²
                                </span>
                              </div>
                            </div>
                          </div>
                          {(newStock.space_type === 'Mezzanine' 
-                           ? selectedWarehouse.mezzanine_free 
-                           : selectedWarehouse.free_space) - newStock.area_used < 0 && (
+                           ? (selectedWarehouse.mezzanine_free || 0)
+                           : (selectedWarehouse.free_space || 0)) - newStock.area_used < 0 && (
                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
                              <div className="text-xs text-red-700">
                                ⚠️ Warning: Requested space ({newStock.area_used} m²) exceeds available {newStock.space_type === 'Mezzanine' ? 'mezzanine' : 'ground floor'} space ({(newStock.space_type === 'Mezzanine' ? selectedWarehouse.mezzanine_free : selectedWarehouse.free_space)} m²)
@@ -1611,8 +1618,8 @@ function StockContent() {
                     if (!selectedWarehouse) return true
                     
                     const availableSpace = newStock.space_type === 'Mezzanine' 
-                      ? selectedWarehouse.mezzanine_free 
-                      : selectedWarehouse.free_space
+                      ? (selectedWarehouse.mezzanine_free || 0)
+                      : (selectedWarehouse.free_space || 0)
                     
                     return newStock.area_used > availableSpace
                   })())

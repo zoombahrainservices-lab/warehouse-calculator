@@ -1,4 +1,4 @@
-                                                                                  import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createOrUpdateUser, createSession } from '@/lib/auth'
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!

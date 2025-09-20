@@ -227,17 +227,42 @@ export default function DispatchedStocksPage() {
       // Create PDF
       const pdf = new jsPDF('l', 'mm', 'a4') // Landscape orientation
       
-      // Add title
-      pdf.setFontSize(16)
-      pdf.text('Dispatched Stocks Report (GDN)', 20, 20)
+      // Add Zoom logo at top left (2x larger - 40x40mm)
+      try {
+        const logoResponse = await fetch('/zoom-logo.png')
+        const logoBlob = await logoResponse.blob()
+        const logoDataUrl = await new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.readAsDataURL(logoBlob)
+        })
+        
+        // Add logo (40x40mm size, positioned at top left)
+        pdf.addImage(logoDataUrl as string, 'PNG', 20, 10, 40, 40)
+      } catch (logoError) {
+        console.warn('Could not load logo:', logoError)
+        // Continue without logo if it fails to load
+      }
+      
+      // Add title centered and right below the logo
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      const pageWidth = pdf.internal.pageSize.width
+      const titleText = 'Goods Dispatch Note (GDN)'
+      const titleWidth = pdf.getTextWidth(titleText)
+      const titleX = (pageWidth - titleWidth) / 2
+      pdf.text(titleText, titleX, 60)
+      
+      // Reset font for other text
+      pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(12)
-      pdf.text(`Occupant: ${occupant?.name || 'N/A'}`, 20, 30)
-      pdf.text(`Warehouse: ${warehouse?.name || 'N/A'}`, 20, 35)
-      pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, 40)
-      pdf.text(`Total Items: ${filteredStockData.length}`, 20, 45)
+      pdf.text(`Occupant: ${occupant?.name || 'N/A'}`, 20, 70)
+      pdf.text(`Warehouse: ${warehouse?.name || 'N/A'}`, 20, 75)
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, 80)
+      pdf.text(`Total Items: ${filteredStockData.length}`, 20, 85)
 
       // Add table headers
-      let yPosition = 60
+      let yPosition = 100
       pdf.setFontSize(10)
       pdf.text('Stock #', 20, yPosition)
       pdf.text('Product Name', 40, yPosition)
@@ -266,6 +291,25 @@ export default function DispatchedStocksPage() {
         
         yPosition += 8
       })
+
+      // Add address at the bottom of the page
+      const pageHeight = pdf.internal.pageSize.height
+      const addressY = pageHeight - 20
+      
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100) // Gray color for address
+      pdf.text('Zoom Bahrain Services', 20, addressY)
+      pdf.text('12, Bldg, 656 Rd No 3625', 20, addressY + 5)
+      pdf.text('Manama, The Kingdom of Bahrain', 20, addressY + 10)
+      
+      // Add page numbers if multiple pages
+      const totalPages = pdf.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        pdf.text(`Page ${i} of ${totalPages}`, pdf.internal.pageSize.width - 30, pageHeight - 10)
+      }
 
       // Download the PDF
       const fileName = `GDN_Report_${occupant?.name || 'Stock'}_${new Date().toISOString().split('T')[0]}.pdf`
@@ -356,15 +400,18 @@ export default function DispatchedStocksPage() {
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                GDN - Dispatched Stocks - {occupant?.name || 'Loading...'}
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                {warehouse?.name} • {occupant?.name} • {totalItems} dispatched items
-              </p>
-            </div>
+          <div className="text-center py-6">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              GDN
+            </h1>
+            <h2 className="text-2xl font-semibold text-gray-700 mb-2">
+              Dispatched Stocks - {occupant?.name || 'Loading...'}
+            </h2>
+            <p className="text-sm text-gray-500">
+              {warehouse?.name} • {occupant?.name} • {totalItems} dispatched items
+            </p>
+          </div>
+          <div className="flex justify-end items-center pb-4">
             <div className="flex space-x-4">
               <Link
                 href={`/warehouses/${warehouseId}/add-stock?occupantId=${occupantId}`}

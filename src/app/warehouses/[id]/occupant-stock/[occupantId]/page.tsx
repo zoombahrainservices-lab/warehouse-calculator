@@ -11,6 +11,7 @@ interface StockItem {
   id: string
   client_name: string
   client_email: string
+  product_name?: string
   product_type: string
   quantity: number
   unit: string
@@ -28,6 +29,7 @@ interface StockItem {
   total_received_quantity?: number
   total_delivered_quantity?: number
   initial_quantity?: number
+  remaining_quantity?: number
 }
 
 interface Occupant {
@@ -47,7 +49,7 @@ interface Warehouse {
   location: string
 }
 
-type SortField = 'id' | 'description' | 'quantity' | 'entry_date' | 'status' | 'current_quantity'
+type SortField = 'id' | 'description' | 'quantity' | 'entry_date' | 'status' | 'current_quantity' | 'total_delivered_quantity'
 type SortDirection = 'asc' | 'desc'
 
 export default function OccupantStockDetailsPage() {
@@ -207,7 +209,7 @@ export default function OccupantStockDetailsPage() {
   }
 
   const openDeliveryModal = (stockItem: StockItem) => {
-    const remainingQuantity = stockItem.remaining_quantity || stockItem.current_quantity
+    const remainingQuantity = stockItem.remaining_quantity || stockItem.current_quantity || 0
     setDeliveryModal({
       isOpen: true,
       stockItem,
@@ -227,7 +229,7 @@ export default function OccupantStockDetailsPage() {
     if (!deliveryModal.stockItem) return
 
     const deliveryQuantity = parseFloat(deliveryModal.deliveryQuantity)
-    const remainingQuantity = deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity
+    const remainingQuantity = deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity || 0
     const totalReceived = deliveryModal.stockItem.total_received_quantity || deliveryModal.stockItem.quantity
     const alreadyDelivered = deliveryModal.stockItem.total_delivered_quantity || 0
     
@@ -309,17 +311,42 @@ export default function OccupantStockDetailsPage() {
       // Create PDF
       const pdf = new jsPDF('l', 'mm', 'a4') // Landscape orientation
       
-      // Add title
-      pdf.setFontSize(16)
-      pdf.text('Stock History Report (GRN)', 20, 20)
+      // Add Zoom logo at top left (2x larger - 40x40mm)
+      try {
+        const logoResponse = await fetch('/zoom-logo.png')
+        const logoBlob = await logoResponse.blob()
+        const logoDataUrl = await new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.readAsDataURL(logoBlob)
+        })
+        
+        // Add logo (40x40mm size, positioned at top left)
+        pdf.addImage(logoDataUrl as string, 'PNG', 20, 10, 40, 40)
+      } catch (logoError) {
+        console.warn('Could not load logo:', logoError)
+        // Continue without logo if it fails to load
+      }
+      
+      // Add title centered and right below the logo
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      const pageWidth = pdf.internal.pageSize.width
+      const titleText = 'Goods Received Note (GRN)'
+      const titleWidth = pdf.getTextWidth(titleText)
+      const titleX = (pageWidth - titleWidth) / 2
+      pdf.text(titleText, titleX, 60)
+      
+      // Reset font for other text
+      pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(12)
-      pdf.text(`Occupant: ${occupant?.name || 'N/A'}`, 20, 30)
-      pdf.text(`Warehouse: ${warehouse?.name || 'N/A'}`, 20, 35)
-      pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, 40)
-      pdf.text(`Total Items: ${filteredStockData.length}`, 20, 45)
+      pdf.text(`Occupant: ${occupant?.name || 'N/A'}`, 20, 70)
+      pdf.text(`Warehouse: ${warehouse?.name || 'N/A'}`, 20, 75)
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, 80)
+      pdf.text(`Total Items: ${filteredStockData.length}`, 20, 85)
 
       // Add table headers
-      let yPosition = 60
+      let yPosition = 100
       pdf.setFontSize(10)
       pdf.text('Stock #', 20, yPosition)
       pdf.text('Product Name', 40, yPosition)
@@ -346,6 +373,25 @@ export default function OccupantStockDetailsPage() {
         
         yPosition += 8
       })
+
+      // Add address at the bottom of the page
+      const pageHeight = pdf.internal.pageSize.height
+      const addressY = pageHeight - 20
+      
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100) // Gray color for address
+      pdf.text('Zoom Bahrain Services', 20, addressY)
+      pdf.text('12, Bldg, 656 Rd No 3625', 20, addressY + 5)
+      pdf.text('Manama, The Kingdom of Bahrain', 20, addressY + 10)
+      
+      // Add page numbers if multiple pages
+      const totalPages = pdf.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        pdf.text(`Page ${i} of ${totalPages}`, pdf.internal.pageSize.width - 30, pageHeight - 10)
+      }
 
       // Download the PDF
       const fileName = `GRN_Report_${occupant?.name || 'Stock'}_${new Date().toISOString().split('T')[0]}.pdf`
@@ -403,10 +449,9 @@ export default function OccupantStockDetailsPage() {
 
   // Calculate summary statistics
   const totalItems = filteredStockData.length
-  const totalReceived = filteredStockData.reduce((sum, item) => sum + (item.quantity || 0), 0)
-  const totalDelivered = filteredStockData.filter(item => item.status === 'completed')
-    .reduce((sum, item) => sum + (item.quantity || 0), 0)
-  const totalLeft = totalReceived - totalDelivered
+  const totalReceived = filteredStockData.reduce((sum, item) => sum + (item.total_received_quantity || item.quantity || 0), 0)
+  const totalDelivered = filteredStockData.reduce((sum, item) => sum + (item.total_delivered_quantity || 0), 0)
+  const totalLeft = filteredStockData.reduce((sum, item) => sum + (item.remaining_quantity || item.current_quantity || 0), 0)
 
   if (authLoading) {
     return (
@@ -438,15 +483,18 @@ export default function OccupantStockDetailsPage() {
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Stock History (GRN) - {occupant?.name || 'Loading...'}
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                {warehouse?.name} • {occupant?.name} • {totalItems} items (Active & Completed)
-              </p>
-            </div>
+          <div className="text-center py-6">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              GRN
+            </h1>
+            <h2 className="text-2xl font-semibold text-gray-700 mb-2">
+              Stock History - {occupant?.name || 'Loading...'}
+            </h2>
+            <p className="text-sm text-gray-500">
+              {warehouse?.name} • {occupant?.name} • {totalItems} items (Active & Completed)
+            </p>
+          </div>
+          <div className="flex justify-end items-center pb-4">
             <div className="flex space-x-4">
               <Link
                 href={`/warehouses/${warehouseId}/add-stock?occupantId=${occupantId}`}
@@ -560,6 +608,10 @@ export default function OccupantStockDetailsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Remaining</p>
+                <p className="text-2xl font-semibold text-gray-900">{totalLeft.toLocaleString()}</p>
               </div>
             </div>
           </div>
@@ -749,18 +801,18 @@ export default function OccupantStockDetailsPage() {
                         {item.total_delivered_quantity || 0} {item.unit}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.remaining_quantity || item.current_quantity} {item.unit}
+                        {(item.remaining_quantity || item.current_quantity || 0)} {item.unit}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(item.entry_date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor((item.remaining_quantity || item.current_quantity) > 0 ? 'active' : 'completed')}`}>
-                          {(item.remaining_quantity || item.current_quantity) > 0 ? 'Active' : 'Completed'}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor((item.remaining_quantity || item.current_quantity || 0) > 0 ? 'active' : 'completed')}`}>
+                          {(item.remaining_quantity || item.current_quantity || 0) > 0 ? 'Active' : 'Completed'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {(item.remaining_quantity || item.current_quantity) > 0 ? (
+                        {(item.remaining_quantity || item.current_quantity || 0) > 0 ? (
                           <button
                             onClick={() => openDeliveryModal(item)}
                             className="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded-md transition-colors"
@@ -815,7 +867,7 @@ export default function OccupantStockDetailsPage() {
                   <strong>Already Delivered:</strong> {deliveryModal.stockItem.total_delivered_quantity || 0} {deliveryModal.stockItem.unit}
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
-                  <strong>Remaining Quantity:</strong> {deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity} {deliveryModal.stockItem.unit}
+                  <strong>Remaining Quantity:</strong> {deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity || 0} {deliveryModal.stockItem.unit}
                 </p>
               </div>
 
@@ -827,7 +879,7 @@ export default function OccupantStockDetailsPage() {
                   type="number"
                   min="0.01"
                   step="0.01"
-                  max={deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity}
+                  max={deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity || 0}
                   value={deliveryModal.deliveryQuantity}
                   onChange={(e) => setDeliveryModal(prev => ({
                     ...prev,
@@ -837,7 +889,7 @@ export default function OccupantStockDetailsPage() {
                   placeholder="Enter delivery quantity"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Maximum: {deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity} {deliveryModal.stockItem.unit}
+                  Maximum: {deliveryModal.stockItem.remaining_quantity || deliveryModal.stockItem.current_quantity || 0} {deliveryModal.stockItem.unit}
                 </p>
               </div>
 

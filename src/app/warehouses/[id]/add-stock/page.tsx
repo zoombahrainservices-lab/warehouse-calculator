@@ -123,8 +123,8 @@ function AddStockPageContent() {
         occupantId: occupantId
       }
 
-      // Use the existing user stock API for now
-      const response = await fetch('/api/user/stock', {
+      // Use the warehouse stock API
+      const response = await fetch(`/api/warehouses/${warehouseId}/stock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

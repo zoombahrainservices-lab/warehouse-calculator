@@ -1,119 +1,234 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+import { validateSessionFromRequest } from '@/lib/auth'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
-
+// GET /api/warehouses/[id]/stock - Get stock items for a warehouse
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params
-    console.log('🔍 Stock API called with params:', resolvedParams)
-    const { id: warehouseId } = resolvedParams
-    const { searchParams } = new URL(request.url)
-    const occupantId = searchParams.get('occupantId')
-
-    console.log('📊 API parameters:', { warehouseId, occupantId })
-
-    if (!warehouseId) {
-      console.log('❌ Missing warehouse ID')
-      return NextResponse.json({ error: 'Warehouse ID is required' }, { status: 400 })
+    const { id: warehouseId } = await params
+    
+    // Validate session
+    const sessionValidation = await validateSessionFromRequest(request)
+    if (!sessionValidation.isValid) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
 
-    // Start with a basic query for original stocks only (exclude dispatched records)
+    // Get query parameters
+    const { searchParams } = new URL(request.url)
+    const occupantId = searchParams.get('occupantId')
+    
+    console.log('📊 Loading stock data for warehouse:', warehouseId, occupantId ? `and occupant: ${occupantId}` : '')
+    
+    // Build query based on whether we're filtering by occupant
     let query = supabase
       .from('client_stock')
       .select('*')
       .in('status', ['active', 'completed']) // Show both active and completed stocks
       .not('id', 'like', 'dispatched-%') // Exclude dispatched records (they go to GDN page)
       .order('entry_date', { ascending: false })
-      .limit(100) // Limit results for performance
-
-    // If occupantId is provided, try to filter by occupant
+      .limit(100)
+    
+    // If occupantId is provided, filter by that occupant
     if (occupantId) {
-      console.log('👤 Looking up occupant:', occupantId)
-      // First get the occupant details to match by name/email
-      const { data: occupant, error: occupantError } = await supabase
+      // Get occupant details to filter by client_name
+      const { data: occupantData, error: occupantError } = await supabase
         .from('warehouse_occupants')
-        .select('name, contact_info')
+        .select('name')
+        .eq('id', occupantId)
+        .single()
+      
+      if (occupantError) {
+        console.error('Error loading occupant:', occupantError)
+        return NextResponse.json(
+          { error: 'Occupant not found' },
+          { status: 404 }
+        )
+      }
+      
+      if (occupantData) {
+        query = query.eq('client_name', occupantData.name)
+        console.log('🔍 Filtering by occupant:', occupantData.name)
+      }
+    }
+    
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error loading stock data:', error)
+      return NextResponse.json(
+        { error: 'Failed to load stock data' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ Loaded stock data:', data?.length || 0, 'items')
+    if (occupantId && data) {
+      console.log('📋 Stock items for occupant:', data.map(item => ({ id: item.id, client_name: item.client_name, product_name: item.product_name })))
+    }
+    return NextResponse.json({ data: data || [] })
+
+  } catch (error) {
+    console.error('Error in GET /api/warehouses/[id]/stock:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST /api/warehouses/[id]/stock - Add new stock item to warehouse
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: warehouseId } = await params
+    
+    // Validate session
+    const sessionValidation = await validateSessionFromRequest(request)
+    if (!sessionValidation.isValid) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const {
+      productName,
+      productType,
+      quantity,
+      unit,
+      description,
+      areaUsed,
+      storageLocation,
+      section,
+      occupantId
+    } = body
+
+    // Validate required fields
+    if (!productName || !productType || !quantity) {
+      return NextResponse.json(
+        { error: 'Missing required fields: productName, productType, quantity' },
+        { status: 400 }
+      )
+    }
+
+    // Parse numeric values
+    const parsedQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity
+    const parsedAreaUsed = typeof areaUsed === 'string' ? parseFloat(areaUsed) : (areaUsed || 0)
+
+    console.log('📦 Adding stock to warehouse:', {
+      warehouseId,
+      productName,
+      productType,
+      quantity: parsedQuantity,
+      areaUsed: parsedAreaUsed,
+      occupantId
+    })
+
+    // Get warehouse and occupant information
+    let warehouse = null
+    let occupant = null
+
+    // Load warehouse data
+    const { data: warehouseData, error: warehouseError } = await supabase
+      .from('warehouses')
+      .select('*')
+      .eq('id', warehouseId)
+      .single()
+
+    if (warehouseError) {
+      console.error('Error loading warehouse:', warehouseError)
+      return NextResponse.json(
+        { error: 'Warehouse not found' },
+        { status: 404 }
+      )
+    }
+    warehouse = warehouseData
+
+    // Load occupant data if occupantId is provided
+    if (occupantId) {
+      const { data: occupantData, error: occupantError } = await supabase
+        .from('warehouse_occupants')
+        .select('*')
         .eq('id', occupantId)
         .single()
 
       if (occupantError) {
-        console.log('❌ Error fetching occupant:', occupantError)
-        // Don't return error, just show all stock data
-        console.log('⚠️ Showing all stock data instead of filtering by occupant')
-      } else if (!occupant) {
-        console.log('❌ Occupant not found in database')
-        // Don't return error, just show all stock data
-        console.log('⚠️ Showing all stock data instead of filtering by occupant')
-      } else {
-        console.log('✅ Found occupant:', occupant)
-        // Filter stock by occupant name or contact info
-        query = query.or(`client_name.ilike.%${occupant.name}%,client_email.ilike.%${occupant.contact_info}%`)
-        console.log('🔍 Applied occupant filter for:', occupant.name)
+        console.error('Error loading occupant:', occupantError)
+        return NextResponse.json(
+          { error: 'Occupant not found' },
+          { status: 404 }
+        )
       }
-    } else {
-      console.log('⚠️ No occupantId provided, showing all active stock data')
+      occupant = occupantData
     }
 
-    console.log('🔍 Executing stock query...')
-    let { data: stockData, error } = await query
-
-    if (error) {
-      console.error('❌ Error with filtered query, trying basic query:', error)
-      // Try with the most basic query possible
-      const basicQuery = supabase
-        .from('client_stock')
-        .select('*')
-        .in('status', ['active', 'completed'])
-        .not('id', 'like', 'dispatched-%') // Exclude dispatched records
-        .limit(50)
+    // Create stock item
+    const stockId = `stock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    
+    const stockData = {
+      id: stockId,
+      client_name: occupant?.name || 'Warehouse Stock',
+      client_email: occupant?.contact_info || '',
+      client_phone: occupant?.contact_info || '',
+      product_name: productName,
+      product_type: productType,
+      quantity: parsedQuantity,
+      unit: unit || 'pieces',
+      description: description || productName,
+      storage_location: storageLocation || section || 'Warehouse Storage',
+      space_type: occupant?.floor_type || 'Ground Floor',
+      area_used: parsedAreaUsed,
+      entry_date: new Date().toISOString().split('T')[0],
+      status: 'active',
+      notes: `Warehouse: ${warehouse.name}${occupant ? `, Occupant: ${occupant.name}` : ''}${section ? `, Section: ${section}` : ''}`,
       
-      const basicResult = await basicQuery
-      stockData = basicResult.data
-      error = basicResult.error
+      // Quantity tracking fields
+      current_quantity: parsedQuantity,
+      total_received_quantity: parsedQuantity,
+      total_delivered_quantity: 0,
+      initial_quantity: parsedQuantity,
       
-      if (error) {
-        console.error('❌ Error with basic query:', error)
-        // Return empty data instead of error
-        stockData = []
-        console.log('⚠️ Returning empty stock data due to query errors')
-      } else {
-        console.log('✅ Basic query successful, found:', stockData?.length || 0, 'items')
-      }
-    } else {
-      console.log('✅ Stock query successful, found:', stockData?.length || 0, 'items')
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
 
-    // Calculate additional fields for each stock item using existing schema
-    const enrichedStockData = stockData?.map(item => {
-      const originalReceivedQuantity = item.quantity || item.total_received_quantity || item.initial_quantity // This should never change
-      const deliveredQuantity = item.total_delivered_quantity || 0 // Total delivered so far
-      const calculatedRemainingQuantity = originalReceivedQuantity - deliveredQuantity // Proper calculation: received - delivered
-      
-      return {
-        ...item,
-        current_quantity: calculatedRemainingQuantity, // Use calculated remaining quantity
-        total_received_quantity: originalReceivedQuantity,
-        total_delivered_quantity: deliveredQuantity,
-        initial_quantity: originalReceivedQuantity,
-        original_received_quantity: originalReceivedQuantity,
-        remaining_quantity: calculatedRemainingQuantity // For compatibility with frontend
-      }
-    }) || []
+    console.log('📦 Creating stock item:', stockData)
 
-    console.log('📤 Returning response with', enrichedStockData?.length || 0, 'items')
+    const { data: newStock, error: stockError } = await supabase
+      .from('client_stock')
+      .insert([stockData])
+      .select()
+      .single()
+
+    if (stockError) {
+      console.error('Error creating stock item:', stockError)
+      return NextResponse.json(
+        { error: 'Failed to create stock item' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ Stock item created successfully:', newStock.id)
+
     return NextResponse.json({
       success: true,
-      data: enrichedStockData || []
+      data: newStock
     })
 
   } catch (error) {
-    console.error('Stock API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error in POST /api/warehouses/[id]/stock:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
