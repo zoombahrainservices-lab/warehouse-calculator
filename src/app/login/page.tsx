@@ -130,17 +130,19 @@ function LoginPageContent() {
         return
       }
 
-      // For email signup users (without password_hash), allow login with any password
-      // This is a temporary solution - in production, implement proper password storage
-      if (!user.password_hash) {
-        // Allow login for email signup users (temporary solution)
-        console.log('Email signup user logging in without password verification')
-      } else {
-        // Check password for users with password_hash
-        if (user.password_hash !== formData.password) {
+      // Check password for users with password_hash
+      if (user.password_hash) {
+        // Import bcrypt dynamically for client-side use
+        const bcrypt = await import('bcryptjs')
+        const isValidPassword = await bcrypt.compare(formData.password, user.password_hash)
+        
+        if (!isValidPassword) {
           setError('Invalid email or password.')
           return
         }
+      } else {
+        // For users without password_hash (legacy users), allow login with any password
+        console.log('Legacy user logging in without password verification')
       }
 
       // Create session token
